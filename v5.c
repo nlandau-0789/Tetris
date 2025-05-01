@@ -295,7 +295,7 @@ int main(){
     for (int i = 0; i < 160; i++){
         t[i] = false;
     }
-    for (int i = 0; i < 20; i++){
+    for (int i = 0; i < 8; i++){
         t[i] = true;
     }
     for (int i = 2; i < 6; i++){
