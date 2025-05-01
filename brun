@@ -1,7 +1,7 @@
 #!/bin/bash
 
-git add "$1.c" &&
-git commit -m $2 &&
-git push &&
+git add "$1.c" > logs.txt
+git commit -m $2 > logs.txt
+git push > logs.txt
 gcc "$1.c" -mavx -mavx2 -mfma -o "$1.exe" && 
 ./"$1.exe"
