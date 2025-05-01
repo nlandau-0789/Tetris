@@ -251,14 +251,20 @@ __m256i consts[n_consts];
 void calc_consts(__m256i input) {
     __m256i heights = ZERO;
     __m256i holes = ZERO;
+    __m256i cavities = ZERO;
     __m256i zero = ZERO;
     __m256i one = ONE;
+    __m256i cav_mask = ONE;
+    __m256i next_cav_mask = ZERO;
 
     for (int i = 0; i < 16; i++) {
         __m256i cmp = _mm256_and_si256(_mm256_cmpeq_epi16(input, zero), one);
         cmp = _mm256_subs_epu16(one, cmp);
         heights = _mm256_adds_epu16(heights, cmp);
         holes = _mm256_adds_epu16(holes, _mm256_subs_epu16(cmp, _mm256_and_si256(input, one)));
+        next_cav_mask = _mm256_and_si256(input, one);
+        cavities = _mm256_adds_epu16(cavities, _mm256_abs_epi16(_mm256_subs_epi16(cav_mask, next_cav_mask)));
+        cav_mask = next_cav_mask;
         input = _mm256_srli_epi16(input, 1);
     }
     
@@ -267,6 +273,7 @@ void calc_consts(__m256i input) {
     __m256i height_diffs = cut_epi16(_mm256_abs_epi16(_mm256_sub_epi16(rotate_left_one(heights), heights)), 16-9);
     __m256i sum_diffs = add_all_epi16(height_diffs);
     __m256i max_diff = max_all_epi16(height_diffs);
+    __m256i max_cav = max_all_epi16(cavities);
 
     consts[0] = heights;
     consts[1] = max_height;
@@ -274,6 +281,8 @@ void calc_consts(__m256i input) {
     consts[3] = max_holes;
     consts[4] = height_diffs;
     consts[5] = max_diff;
+    consts[6] = cavities;
+    consts[7] = max_cav;
 }
 
 int main(){
@@ -311,6 +320,8 @@ int main(){
     print_m256i_as_int16(consts[3]);
     print_m256i_as_int16(consts[4]);
     print_m256i_as_int16(consts[5]);
+    print_m256i_as_int16(consts[6]);
+    print_m256i_as_int16(consts[7]);
 
     return 0;
 }
