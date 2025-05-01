@@ -286,12 +286,8 @@ void calc_consts(__m256i input) {
 }
 
 int main(){
-    print_m256i_as_int16(ZERO);
-    print_m256i_as_int16(ONES);
-    print_m256i_as_int16(ONE);
-    __m256i vec = _mm256_setr_epi16(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16);
-    print_m256i_as_int16(vec);
-    bool *t = aligned_alloc(32, 160 * sizeof(bool));
+    // bool *t = aligned_alloc(32, 160 * sizeof(bool));
+    bool *t = malloc(160 * sizeof(bool));
     if (!t) {
         perror("aligned_alloc failed");
         return 1;
