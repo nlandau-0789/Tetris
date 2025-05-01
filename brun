@@ -1,3 +1,5 @@
 #!/bin/bash
 
+git add "$1.c"
+git commit -m $2
 gcc "$1.c" -mavx -mavx2 -mfma -o "$1.exe" && ./"$1.exe"
