@@ -308,6 +308,9 @@ int main(){
     for (int i = 4; i < 6; i++){
         t[10*i+4] = true;
     }
+    for (int i = 0; i < 10; i+=2){
+        t[10*i+8] = true;
+    }
     t[159] = true;
     __m256i board = board_from_array(t);
     print_board(board);
