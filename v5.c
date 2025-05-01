@@ -263,7 +263,7 @@ void calc_consts(__m256i input) {
         heights = _mm256_adds_epu16(heights, cmp);
         holes = _mm256_adds_epu16(holes, _mm256_subs_epu16(cmp, _mm256_and_si256(input, one)));
         next_cav_mask = _mm256_and_si256(input, one);
-        cavities = _mm256_adds_epu16(cavities, _mm256_abs_epi16(_mm256_subs_epi16(cav_mask, next_cav_mask)));
+        cavities = _mm256_adds_epu16(cavities, _mm256_subs_epu16(next_cav_mask, cav_mask));
         cav_mask = next_cav_mask;
         input = _mm256_srli_epi16(input, 1);
     }
