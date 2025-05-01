@@ -263,6 +263,7 @@ void calc_consts(__m256i input) {
     }
     
     __m256i max_height = max_all_epi16(heights);
+    __m256i max_holes = max_all_epi16(holes);
     __m256i height_diffs = cut_epi16(_mm256_abs_epi16(_mm256_sub_epi16(rotate_left_one(heights), heights)), 16-9);
     __m256i sum_diffs = add_all_epi16(height_diffs);
     __m256i max_diff = max_all_epi16(height_diffs);
@@ -270,8 +271,8 @@ void calc_consts(__m256i input) {
     consts[0] = heights;
     consts[1] = max_height;
     consts[2] = holes;
-    consts[3] = height_diffs;
-    consts[4] = sum_diffs;
+    consts[3] = max_holes;
+    consts[4] = height_diffs;
     consts[5] = max_diff;
 }
 
