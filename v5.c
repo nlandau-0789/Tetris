@@ -268,7 +268,7 @@ void calc_consts(__m256i input) {
     __m256i one = ONE;
     __m256i cav_mask = ONE;
     __m256i next_cav_mask = ZERO;
-    __m256i three = _mm256_set1_epi16(3);
+    __m256i two = _mm256_set1_epi16(2);
 
     for (int i = 0; i < 16; i++) {
         __m256i cmp = _mm256_and_si256(_mm256_cmpeq_epi16(input, zero), one);
@@ -291,7 +291,7 @@ void calc_consts(__m256i input) {
     __m256i max_diff = max_all_epi16(height_diffs);
     __m256i max_cav = max_all_epi16(cavities);
     __m256i wells_deepness = cut_epi16(_mm256_min_epu16(_mm256_subs_epu16(rotated_right, heights), _mm256_subs_epu16(rotated_left, heights)), 16-10);
-    __m256i wells_mask = _mm256_cmpgt_epi16(wells_deepness, three);
+    __m256i wells_mask = _mm256_cmpgt_epi16(wells_deepness, two);
     __m256i wells = _mm256_and_si256(wells_mask, wells_deepness);
     __m256i is_well = _mm256_and_si256(wells_mask, one);
 
