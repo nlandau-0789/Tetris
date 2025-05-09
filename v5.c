@@ -329,10 +329,10 @@ int main(){
     for (int i = 0; i < 14; i+=2){
         t[10*i+8] = true;
     }
-    for (int i = 0; i < 5; i++){
+    for (int i = 0; i < 4; i++){
         t[10*i] = true;
     }
-    for (int i = 0; i < 5; i++){
+    for (int i = 0; i < 4; i++){
         t[10*i+2] = true;
     }
     t[159] = true;
