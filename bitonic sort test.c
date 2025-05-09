@@ -51,10 +51,10 @@ __m256i bitonic_sort_epu16(__m256i input) {
 
 // test the bitonic sort function
 int main() {
-    __m256i input = _mm256_set_epi16(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16);
-    __m256i input2 = _mm256_set_epi16(16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1);
-    __m256i input3 = _mm256_set_epi16(8, 7, 6, 5, 4, 3, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0);
-    __m256i input4 = _mm256_set_epi16(0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8);
+    __m256i input = _mm256_setr_epi16(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16);
+    __m256i input2 = _mm256_setr_epi16(16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1);
+    __m256i input3 = _mm256_setr_epi16(8, 7, 6, 5, 4, 3, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0);
+    __m256i input4 = _mm256_setr_epi16(0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8);
     __m256i sorted = bitonic_sort_epu16(input);
     printf("\n");
     __m256i sorted2 = bitonic_sort_epu16(input2);
