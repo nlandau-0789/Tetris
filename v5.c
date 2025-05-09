@@ -223,29 +223,6 @@ __m256i add_all_epi16(__m256i input) {
     return result;
 }
 
-// __m256i max_all_epi16(__m256i input) {
-//     __m256i inverted = _mm256_permute2x128_si256(input, input, 0x21);
-//     __m256i sums = _mm256_hadd_epi16(input, inverted);
-//     __m256i subs = _mm256_hsub_epi16(input, inverted);
-//     input = _mm256_abs_epi16(subs);
-//     input = _mm256_add_epi16(sums, input);
-//     sums = _mm256_hadd_epi16(input, inverted);
-//     subs = _mm256_hsub_epi16(input, inverted);
-//     input = _mm256_abs_epi16(subs);
-//     input = _mm256_add_epi16(sums, input);
-//     sums = _mm256_hadd_epi16(input, inverted);
-//     subs = _mm256_hsub_epi16(input, inverted);
-//     input = _mm256_abs_epi16(subs);
-//     input = _mm256_add_epi16(sums, input);
-//     sums = _mm256_hadd_epi16(input, inverted);
-//     subs = _mm256_hsub_epi16(input, inverted);
-//     input = _mm256_abs_epi16(subs);
-//     input = _mm256_add_epi16(sums, input);
-//     __m256i result = cut_epi16(input, 15);
-//     result = _mm256_srli_epi16(result, 4);
-//     return result;
-// }
-
 __m256i max_all_epi16(__m256i input) {
     __m256i inverted = _mm256_permute2x128_si256(input, input, 0x21);
     input = _mm256_max_epi16(input, inverted);
