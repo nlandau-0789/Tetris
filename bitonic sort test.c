@@ -13,17 +13,13 @@ void print_m256i_as_int16(__m256i vec) {
 }
 
 __m256i bitonic_sort_epu16(__m256i input) {
-    print_m256i_as_int16(input);
-    __m256i inverted = _mm256_permute4x64_epi64(input, 0xb1);
-    print_m256i_as_int16(inverted);
     // step 1
-    inverted = _mm256_permute2x128_si256(input, input, 0x21);
+    __m256i inverted = _mm256_permute2x128_si256(input, input, 0x21);
     input = _mm256_permute2x128_si256(_mm256_max_epi16(input, inverted), _mm256_min_epi16(input, inverted), 0x30);
     print_m256i_as_int16(input);
 
     // step 2
-    inverted = _mm256_permute4x64_epi64(input, _MM_SHUFFLE(1, 0, 3, 2));
-    print_m256i_as_int16(inverted);
+    inverted = _mm256_permute4x64_epi64(input, 0xb1);
     input = _mm256_blend_epi32(
         _mm256_max_epi16(input, inverted), 
         _mm256_min_epi16(input, inverted), 
