@@ -223,26 +223,38 @@ __m256i add_all_epi16(__m256i input) {
     return result;
 }
 
+// __m256i max_all_epi16(__m256i input) {
+//     __m256i inverted = _mm256_permute2x128_si256(input, input, 0x21);
+//     __m256i sums = _mm256_hadd_epi16(input, inverted);
+//     __m256i subs = _mm256_hsub_epi16(input, inverted);
+//     input = _mm256_abs_epi16(subs);
+//     input = _mm256_add_epi16(sums, input);
+//     sums = _mm256_hadd_epi16(input, inverted);
+//     subs = _mm256_hsub_epi16(input, inverted);
+//     input = _mm256_abs_epi16(subs);
+//     input = _mm256_add_epi16(sums, input);
+//     sums = _mm256_hadd_epi16(input, inverted);
+//     subs = _mm256_hsub_epi16(input, inverted);
+//     input = _mm256_abs_epi16(subs);
+//     input = _mm256_add_epi16(sums, input);
+//     sums = _mm256_hadd_epi16(input, inverted);
+//     subs = _mm256_hsub_epi16(input, inverted);
+//     input = _mm256_abs_epi16(subs);
+//     input = _mm256_add_epi16(sums, input);
+//     __m256i result = cut_epi16(input, 15);
+//     result = _mm256_srli_epi16(result, 4);
+//     return result;
+// }
+
 __m256i max_all_epi16(__m256i input) {
     __m256i inverted = _mm256_permute2x128_si256(input, input, 0x21);
-    __m256i sums = _mm256_hadd_epi16(input, inverted);
-    __m256i subs = _mm256_hsub_epi16(input, inverted);
-    input = _mm256_abs_epi16(subs);
-    input = _mm256_add_epi16(sums, input);
-    sums = _mm256_hadd_epi16(input, inverted);
-    subs = _mm256_hsub_epi16(input, inverted);
-    input = _mm256_abs_epi16(subs);
-    input = _mm256_add_epi16(sums, input);
-    sums = _mm256_hadd_epi16(input, inverted);
-    subs = _mm256_hsub_epi16(input, inverted);
-    input = _mm256_abs_epi16(subs);
-    input = _mm256_add_epi16(sums, input);
-    sums = _mm256_hadd_epi16(input, inverted);
-    subs = _mm256_hsub_epi16(input, inverted);
-    input = _mm256_abs_epi16(subs);
-    input = _mm256_add_epi16(sums, input);
+    input = _mm256_max_epi16(input, inverted);
+    input = _mm256_max_epi16(input, _mm256_permute4x64_epi64(input, _MM_SHUFFLE(2, 3, 0, 1)));
+    input = _mm256_max_epi16(input, _mm256_permute4x64_epi64(input, _MM_SHUFFLE(1, 0, 3, 2)));
+    input = _mm256_max_epi16(input, _mm256_srli_si256(input, 2));
+    input = _mm256_max_epi16(input, _mm256_srli_si256(input, 4));
+    input = _mm256_max_epi16(input, _mm256_srli_si256(input, 8));
     __m256i result = cut_epi16(input, 15);
-    result = _mm256_srli_epi16(result, 4);
     return result;
 }
 
@@ -256,6 +268,7 @@ void calc_consts(__m256i input) {
     __m256i one = ONE;
     __m256i cav_mask = ONE;
     __m256i next_cav_mask = ZERO;
+    __m256i three = _mm256_set1_epi16(3);
 
     for (int i = 0; i < 16; i++) {
         __m256i cmp = _mm256_and_si256(_mm256_cmpeq_epi16(input, zero), one);
@@ -268,12 +281,19 @@ void calc_consts(__m256i input) {
         input = _mm256_srli_epi16(input, 1);
     }
     
+
+    __m256i rotated_right = rotate_right_one(heights);
+    __m256i rotated_left = rotate_left_one(heights);
     __m256i max_height = max_all_epi16(heights);
     __m256i max_holes = max_all_epi16(holes);
-    __m256i height_diffs = cut_epi16(_mm256_abs_epi16(_mm256_sub_epi16(rotate_left_one(heights), heights)), 16-9);
-    __m256i sum_diffs = add_all_epi16(height_diffs);
+    __m256i height_diffs = cut_epi16(_mm256_abs_epi16(_mm256_sub_epi16(rotated_left, heights)), 16-9);
+    // __m256i sum_diffs = add_all_epi16(height_diffs);
     __m256i max_diff = max_all_epi16(height_diffs);
     __m256i max_cav = max_all_epi16(cavities);
+    __m256i wells_deepness = cut_epi16(_mm256_min_epu16(_mm256_subs_epu16(rotated_right, heights), _mm256_subs_epu16(rotated_left, heights)), 16-10);
+    __m256i wells_mask = _mm256_cmpgt_epi16(wells_deepness, three);
+    __m256i wells = _mm256_and_si256(wells_mask, wells_deepness);
+    __m256i is_well = _mm256_and_si256(wells_mask, one);
 
     consts[0] = heights;
     consts[1] = max_height;
@@ -283,6 +303,8 @@ void calc_consts(__m256i input) {
     consts[5] = max_diff;
     consts[6] = cavities;
     consts[7] = max_cav;
+    consts[8] = wells;
+    consts[9] = is_well;
 }
 
 int main(){
@@ -321,6 +343,8 @@ int main(){
     print_m256i_as_int16(consts[5]);
     print_m256i_as_int16(consts[6]);
     print_m256i_as_int16(consts[7]);
+    print_m256i_as_int16(consts[8]);
+    print_m256i_as_int16(consts[9]);
 
     return 0;
 }
