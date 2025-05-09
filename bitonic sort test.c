@@ -7,6 +7,9 @@ void print_m256i_as_int16(__m256i vec) {
     short values[16];
     _mm256_storeu_si256((__m256i*)values, vec);
     for (int i = 0; i < 16; i++) {
+        if (i == 8) {
+            printf("\n");
+        }
         printf("%hu ", values[i]);
     }
     printf("\n");
