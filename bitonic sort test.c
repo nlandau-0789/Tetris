@@ -14,7 +14,6 @@ void print_m256i_as_int16(__m256i vec) {
 
 __m256i bitonic_sort_epu16(__m256i input) {
     print_m256i_as_int16(input);
-    // step 4
     __m256i inverted;
     inverted = _mm256_shufflehi_epi16(input, _MM_SHUFFLE(2, 3, 0, 1));
     inverted = _mm256_shufflelo_epi16(inverted, _MM_SHUFFLE(2, 3, 0, 1));
@@ -25,13 +24,14 @@ __m256i bitonic_sort_epu16(__m256i input) {
     );
     print_m256i_as_int16(input);
     
-    // step 3
     inverted = _mm256_shuffle_epi32(input, 0xb1);
     input = _mm256_blend_epi16(
         _mm256_max_epi16(input, inverted),
         _mm256_min_epi16(input, inverted),
-        0x27
+        0x55
     );
+    input = _mm256_shufflehi_epi16(input, _MM_SHUFFLE(0, 2, 1, 3));
+    input = _mm256_shufflelo_epi16(input, _MM_SHUFFLE(0, 2, 1, 3));
     print_m256i_as_int16(input);
     
     return input;
