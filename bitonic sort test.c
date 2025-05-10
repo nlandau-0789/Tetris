@@ -28,7 +28,7 @@ __m256i bitonic_sort_epu16(__m256i input) {
     input = _mm256_blend_epi16(
         _mm256_max_epi16(input, inverted),
         _mm256_min_epi16(input, inverted),
-        0xbb
+        0xaa
     );
     input = _mm256_shufflehi_epi16(input, _MM_SHUFFLE(0, 2, 1, 3));
     input = _mm256_shufflelo_epi16(input, _MM_SHUFFLE(0, 2, 1, 3));
