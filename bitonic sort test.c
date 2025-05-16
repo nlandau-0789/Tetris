@@ -68,8 +68,8 @@ __m256i bitonic_sort_epu16(__m256i input) {
     // step 6
     inverted = _mm256_shufflehi_epi16(input, _MM_SHUFFLE(2, 3, 0, 1));
     inverted = _mm256_shufflelo_epi16(inverted, _MM_SHUFFLE(2, 3, 0, 1));
-    minvec = _mm256_min_epu16(input, inverted);
-    maxvec = _mm256_max_epu16(input, inverted);
+    __m256i minvec = _mm256_min_epu16(input, inverted);
+    __m256i maxvec = _mm256_max_epu16(input, inverted);
     input = _mm256_permute2x128_si256(
         _mm256_blend_epi16(
             maxvec,
@@ -145,8 +145,8 @@ __m256i bitonic_sort_epu16(__m256i input) {
     // step 6
     inverted = _mm256_shufflehi_epi16(input, _MM_SHUFFLE(2, 3, 0, 1));
     inverted = _mm256_shufflelo_epi16(inverted, _MM_SHUFFLE(2, 3, 0, 1));
-    __m256i minvec = _mm256_min_epu16(input, inverted);
-    __m256i maxvec = _mm256_max_epu16(input, inverted);
+    minvec = _mm256_min_epu16(input, inverted);
+    maxvec = _mm256_max_epu16(input, inverted);
     input = _mm256_permute2x128_si256(
         _mm256_blend_epi16(
             maxvec,
