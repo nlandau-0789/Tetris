@@ -17,13 +17,21 @@ __m256i bitonic_sort_epu16(__m256i input) {
     __m256i inverted;
 
 
-    // sort 4x16u
-    inverted = _mm256_shufflehi_epi16(input, _MM_SHUFFLE(2, 3, 0, 1));
-    inverted = _mm256_shufflelo_epi16(inverted, _MM_SHUFFLE(2, 3, 0, 1));
+    // step 1
+    // inverted = _mm256_shufflehi_epi16(input, _MM_SHUFFLE(2, 3, 0, 1));
+    // inverted = _mm256_shufflelo_epi16(inverted, _MM_SHUFFLE(2, 3, 0, 1));
+    // input = _mm256_blend_epi16(
+    //     _mm256_max_epu16(input, inverted),
+    //     _mm256_min_epu16(input, inverted),
+    //     0x66
+    // );
+    // print_m256i_as_int16(input);
+    
+    inverted = _mm256_shuffle_epi32(input, _MM_SHUFFLE(2, 3, 0, 1));
     input = _mm256_blend_epi16(
         _mm256_max_epu16(input, inverted),
         _mm256_min_epu16(input, inverted),
-        0x66
+        0xcc
     );
     print_m256i_as_int16(input);
     return input;
