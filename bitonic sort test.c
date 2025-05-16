@@ -94,7 +94,7 @@ __m256i bitonic_sort_epu16(__m256i input) {
     );
     print_m256i_as_int16(input);
 
-     // step 1
+    // step 1
     inverted = _mm256_shufflehi_epi16(input, _MM_SHUFFLE(2, 3, 0, 1));
     inverted = _mm256_shufflelo_epi16(inverted, _MM_SHUFFLE(2, 3, 0, 1));
     input = _mm256_blend_epi16(
