@@ -23,7 +23,7 @@ __m256i bitonic_sort_epu16(__m256i input) {
     input = _mm256_blend_epi16(
         _mm256_max_epu16(input, inverted),
         _mm256_min_epu16(input, inverted),
-        0x99
+        0x66
     );
     print_m256i_as_int16(input);
     return input;
