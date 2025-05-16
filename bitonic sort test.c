@@ -15,56 +15,16 @@ void print_m256i_as_int16(__m256i vec) {
 __m256i bitonic_sort_epu16(__m256i input) {
     print_m256i_as_int16(input);
     __m256i inverted;
-
-
-    // step 1
-    inverted = _mm256_shufflehi_epi16(input, _MM_SHUFFLE(2, 3, 0, 1));
-    inverted = _mm256_shufflelo_epi16(inverted, _MM_SHUFFLE(2, 3, 0, 1));
-    input = _mm256_blend_epi16(
+    
+    // step 7
+    inverted = _mm256_permute2x128_si256(input, input, 0x21);
+    input = _mm256_permute2x128_si256(
         _mm256_max_epu16(input, inverted),
         _mm256_min_epu16(input, inverted),
-        0x66
+        0x21
     );
     print_m256i_as_int16(input);
     
-
-    // step 2
-    inverted = _mm256_shuffle_epi32(input, _MM_SHUFFLE(2, 3, 0, 1));
-    input = _mm256_blend_epi16(
-        _mm256_max_epu16(input, inverted),
-        _mm256_min_epu16(input, inverted),
-        0x3c
-    );
-    print_m256i_as_int16(input);
-
-    // step 3
-    inverted = _mm256_shufflehi_epi16(input, _MM_SHUFFLE(2, 3, 0, 1));
-    inverted = _mm256_shufflelo_epi16(inverted, _MM_SHUFFLE(2, 3, 0, 1));
-    input = _mm256_blend_epi16(
-        _mm256_max_epu16(input, inverted),
-        _mm256_min_epu16(input, inverted),
-        0x5a
-    );
-    print_m256i_as_int16(input);
-
-    // step 4
-    inverted = _mm256_permute4x64_epi64(input, _MM_SHUFFLE(2, 3, 0, 1));
-    input = _mm256_blend_epi32(
-        _mm256_max_epu16(input, inverted),
-        _mm256_min_epu16(input, inverted),
-        0x3c
-    );
-    print_m256i_as_int16(input);
-
-    // step 5
-    inverted = _mm256_shuffle_epi32(input, _MM_SHUFFLE(2, 3, 0, 1));
-    input = _mm256_blend_epi32(
-        _mm256_max_epu16(input, inverted),
-        _mm256_min_epu16(input, inverted),
-        0x5a
-    );
-    print_m256i_as_int16(input);
-
     // step 6
     inverted = _mm256_shufflehi_epi16(input, _MM_SHUFFLE(2, 3, 0, 1));
     inverted = _mm256_shufflelo_epi16(inverted, _MM_SHUFFLE(2, 3, 0, 1));
@@ -85,15 +45,43 @@ __m256i bitonic_sort_epu16(__m256i input) {
     );
     print_m256i_as_int16(input);
     
-    // step 7
-    inverted = _mm256_permute2x128_si256(input, input, 0x21);
-    input = _mm256_permute2x128_si256(
+    // step 5
+    inverted = _mm256_shuffle_epi32(input, _MM_SHUFFLE(2, 3, 0, 1));
+    input = _mm256_blend_epi32(
         _mm256_max_epu16(input, inverted),
         _mm256_min_epu16(input, inverted),
-        0x21
+        0x5a
     );
     print_m256i_as_int16(input);
-
+    
+    // step 4
+    inverted = _mm256_permute4x64_epi64(input, _MM_SHUFFLE(2, 3, 0, 1));
+    input = _mm256_blend_epi32(
+        _mm256_max_epu16(input, inverted),
+        _mm256_min_epu16(input, inverted),
+        0x3c
+    );
+    print_m256i_as_int16(input);    
+    
+    // step 3
+    inverted = _mm256_shufflehi_epi16(input, _MM_SHUFFLE(2, 3, 0, 1));
+    inverted = _mm256_shufflelo_epi16(inverted, _MM_SHUFFLE(2, 3, 0, 1));
+    input = _mm256_blend_epi16(
+        _mm256_max_epu16(input, inverted),
+        _mm256_min_epu16(input, inverted),
+        0x5a
+    );
+    print_m256i_as_int16(input);
+    
+    // step 2
+    inverted = _mm256_shuffle_epi32(input, _MM_SHUFFLE(2, 3, 0, 1));
+    input = _mm256_blend_epi16(
+        _mm256_max_epu16(input, inverted),
+        _mm256_min_epu16(input, inverted),
+        0x3c
+    );
+    print_m256i_as_int16(input);
+    
     // step 1
     inverted = _mm256_shufflehi_epi16(input, _MM_SHUFFLE(2, 3, 0, 1));
     inverted = _mm256_shufflelo_epi16(inverted, _MM_SHUFFLE(2, 3, 0, 1));
@@ -104,63 +92,73 @@ __m256i bitonic_sort_epu16(__m256i input) {
     );
     print_m256i_as_int16(input);
     
+    // // step 1
+    // inverted = _mm256_shufflehi_epi16(input, _MM_SHUFFLE(2, 3, 0, 1));
+    // inverted = _mm256_shufflelo_epi16(inverted, _MM_SHUFFLE(2, 3, 0, 1));
+    // input = _mm256_blend_epi16(
+    //     _mm256_max_epu16(input, inverted),
+    //     _mm256_min_epu16(input, inverted),
+    //     0x66
+    // );
+    // print_m256i_as_int16(input);
+    
 
-    // step 2
-    inverted = _mm256_shuffle_epi32(input, _MM_SHUFFLE(2, 3, 0, 1));
-    input = _mm256_blend_epi16(
-        _mm256_max_epu16(input, inverted),
-        _mm256_min_epu16(input, inverted),
-        0x3c
-    );
-    print_m256i_as_int16(input);
+    // // step 2
+    // inverted = _mm256_shuffle_epi32(input, _MM_SHUFFLE(2, 3, 0, 1));
+    // input = _mm256_blend_epi16(
+    //     _mm256_max_epu16(input, inverted),
+    //     _mm256_min_epu16(input, inverted),
+    //     0x3c
+    // );
+    // print_m256i_as_int16(input);
 
-    // step 3
-    inverted = _mm256_shufflehi_epi16(input, _MM_SHUFFLE(2, 3, 0, 1));
-    inverted = _mm256_shufflelo_epi16(inverted, _MM_SHUFFLE(2, 3, 0, 1));
-    input = _mm256_blend_epi16(
-        _mm256_max_epu16(input, inverted),
-        _mm256_min_epu16(input, inverted),
-        0x5a
-    );
-    print_m256i_as_int16(input);
+    // // step 3
+    // inverted = _mm256_shufflehi_epi16(input, _MM_SHUFFLE(2, 3, 0, 1));
+    // inverted = _mm256_shufflelo_epi16(inverted, _MM_SHUFFLE(2, 3, 0, 1));
+    // input = _mm256_blend_epi16(
+    //     _mm256_max_epu16(input, inverted),
+    //     _mm256_min_epu16(input, inverted),
+    //     0x5a
+    // );
+    // print_m256i_as_int16(input);
 
-    // step 4
-    inverted = _mm256_permute4x64_epi64(input, _MM_SHUFFLE(2, 3, 0, 1));
-    input = _mm256_blend_epi32(
-        _mm256_max_epu16(input, inverted),
-        _mm256_min_epu16(input, inverted),
-        0x3c
-    );
-    print_m256i_as_int16(input);
+    // // step 4
+    // inverted = _mm256_permute4x64_epi64(input, _MM_SHUFFLE(2, 3, 0, 1));
+    // input = _mm256_blend_epi32(
+    //     _mm256_max_epu16(input, inverted),
+    //     _mm256_min_epu16(input, inverted),
+    //     0x3c
+    // );
+    // print_m256i_as_int16(input);
 
-    // step 5
-    inverted = _mm256_shuffle_epi32(input, _MM_SHUFFLE(2, 3, 0, 1));
-    input = _mm256_blend_epi32(
-        _mm256_max_epu16(input, inverted),
-        _mm256_min_epu16(input, inverted),
-        0x5a
-    );
-    print_m256i_as_int16(input);
+    // // step 5
+    // inverted = _mm256_shuffle_epi32(input, _MM_SHUFFLE(2, 3, 0, 1));
+    // input = _mm256_blend_epi32(
+    //     _mm256_max_epu16(input, inverted),
+    //     _mm256_min_epu16(input, inverted),
+    //     0x5a
+    // );
+    // print_m256i_as_int16(input);
 
-    // step 6
-    inverted = _mm256_shufflehi_epi16(input, _MM_SHUFFLE(2, 3, 0, 1));
-    inverted = _mm256_shufflelo_epi16(inverted, _MM_SHUFFLE(2, 3, 0, 1));
-    minvec = _mm256_min_epu16(input, inverted);
-    maxvec = _mm256_max_epu16(input, inverted);
-    input = _mm256_permute2x128_si256(
-        _mm256_blend_epi16(
-            maxvec,
-            minvec,
-            0x55
-        ), 
-        _mm256_blend_epi16(
-            maxvec,
-            minvec,
-            0xaa
-        ), 
-        0x12
-    );
-    print_m256i_as_int16(input);
+    // // step 6
+    // inverted = _mm256_shufflehi_epi16(input, _MM_SHUFFLE(2, 3, 0, 1));
+    // inverted = _mm256_shufflelo_epi16(inverted, _MM_SHUFFLE(2, 3, 0, 1));
+    // minvec = _mm256_min_epu16(input, inverted);
+    // maxvec = _mm256_max_epu16(input, inverted);
+    // input = _mm256_permute2x128_si256(
+    //     _mm256_blend_epi16(
+    //         maxvec,
+    //         minvec,
+    //         0x55
+    //     ), 
+    //     _mm256_blend_epi16(
+    //         maxvec,
+    //         minvec,
+    //         0xaa
+    //     ), 
+    //     0x12
+    // );
+    // print_m256i_as_int16(input);
 
     return input;
 }
