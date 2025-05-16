@@ -86,7 +86,7 @@ __m256i bitonic_sort_epu16(__m256i input) {
     print_m256i_as_int16(input);
     
     // step 7
-    inverted = _mm256_shuffle_epi32(input, _MM_SHUFFLE(1, 0, 3, 2));
+    inverted = _mm256_permute2x128_si256(input, input, 0x21);
     print_m256i_as_int16(inverted);
 
     return input;
