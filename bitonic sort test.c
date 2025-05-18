@@ -130,7 +130,7 @@ __m256i bitonic_sort_epu16(__m256i input) {
 
 // test the bitonic sort function
 int main() {
-    __m256i input = _mm256_setr_epi16(5, -3, 2, 5, 4, -5, 5, 0, 1, 0, -4, 3, 2, 1, -5, -4);
+    __m256i input = _mm256_setr_epi16(6, 7, 1, 5, 7, 10, 6, 3, 8, 8, 3, 8, 3, 8, 7, 2);
     __m256i sorted = bitonic_sort_epu16(input);
     return 0;
 }
