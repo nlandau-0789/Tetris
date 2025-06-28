@@ -1,10 +1,8 @@
 #ifndef IMPORT_STD_H
-#include <immintrin.h>
-#include <stdio.h>
-#include <stdbool.h>
-#include <stdlib.h>
-#include <stdint.h>
+#include "std.h"
+#define IMPORT_STD_H
 #endif
+
 
 void print_m256i_as_int16(__m256i vec) {
     short values[16];
@@ -14,3 +12,5 @@ void print_m256i_as_int16(__m256i vec) {
     }
     printf("\n");
 }
+
+#define PRINT_EPU16_H
