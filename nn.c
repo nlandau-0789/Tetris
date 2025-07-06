@@ -175,7 +175,7 @@ void backpropagate(nn* network, float *input, float target, float (*activation)(
                 network->weights[layer][j][i] -= learning_rate * error / derrordw;
                 network->biases[layer][j] -= learning_rate * error / derrordb;
             }
-            xhat[layer - 1][i] = x[layer - 1][i] - error / derrordx;
+            xhat[layer - 1][i] = x[layer - 1][i] - error / derrordx; // il peut il y avoir un problème ici, il faut peut-etre diviser l'erreur par le nombre de neurones de la couche précédente
         }
     }
 
