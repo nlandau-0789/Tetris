@@ -1,0 +1,13 @@
+{
+    "files.associations": {
+        "charconv": "c",
+        "ctime": "c",
+        "format": "c",
+        "limits": "c",
+        "numeric": "c",
+        "streambuf": "c",
+        "tuple": "c",
+        "type_traits": "c",
+        "functional": "c"
+    }
+}
