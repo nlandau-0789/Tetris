@@ -2,6 +2,7 @@
 #include "utils/print_epu16.h"
 #include <stdlib.h>
 #include <time.h>
+#include <math.h>
 
 struct nn {
     float *input;
@@ -13,7 +14,7 @@ struct nn {
 
 typedef struct nn nn;
 
-void init_nn(nn* network, int input_size, int output_size, int n_hidden_layers, int* hidden_layer_sizes) {
+void init_nn(nn* network, int input_size, int n_hidden_layers, int* hidden_layer_sizes) {
     network->input_size = input_size;
     network->n_hidden_layers = n_hidden_layers;
     network->hidden_layer_sizes = hidden_layer_sizes;
@@ -110,9 +111,9 @@ void backpropagate(nn* network, float *input, float target, float (*activation)(
     for (int i = 0; i < n_layers; i++)
         x[i] = (float*)malloc(network->hidden_layer_sizes[i] * sizeof(float));
     
-    float **xhat = (float**)malloc(n_layers * sizeof(float*));
+    float **dedx = (float**)malloc(n_layers * sizeof(float*));
     for (int i = 0; i < n_layers; i++)
-        xhat[i] = (float*)malloc(network->hidden_layer_sizes[i] * sizeof(float));
+        dedx[i] = (float*)malloc(network->hidden_layer_sizes[i] * sizeof(float));
     
     // Forward pass
     for (int i = 0; i < network->hidden_layer_sizes[0]; i++) {
@@ -144,57 +145,93 @@ void backpropagate(nn* network, float *input, float target, float (*activation)(
         y += network->output_weights[i] * activation(x[n_layers - 1][i]);
     }
 
-    float error = 0.5f * (target - activation(y)) * (target - activation(y));
-    // float delta = - learning_rate * error / activation_derivative(y) / (target - activation(y));
+    // Standard output error and delta
+    float output_error = activation(y) - target;
+    float delta = output_error * activation_derivative(y);
 
-    // Update output weights
+    // Update output weights and dedx for next layer
     for (int i = 0; i < last_layer_size; i++) {
-        float weight = network->output_weights[i];
-        network->output_weights[i] -= learning_rate * error / activation_derivative(y) / (target - activation(y)) / activation(x[n_layers - 1][i]);
-        xhat[n_layers - 1][i] = x[n_layers - 1][i] - error / activation_derivative(y) / (target - activation(y)) / weight;
+        network->output_weights[i] -= learning_rate * delta * activation(x[n_layers - 1][i]);
+        dedx[n_layers - 1][i] = delta * network->output_weights[i];
     }
 
+    // Hidden layers backpropagation
     for (int layer = n_layers - 1; layer > 0; layer--) {
         int layer_size = network->hidden_layer_sizes[layer];
         int prev_layer_size = network->hidden_layer_sizes[layer - 1];
 
-        float error = 0.0f;
-        for (int j = 0; j < layer_size; j++) {
-            error += 0.5f * (x[layer][j] - xhat[layer][j]) * (x[layer][j] - xhat[layer][j]);
+        for (int i = 0; i < prev_layer_size; i++) {
+            float error = 0.0f;
+            for (int j = 0; j < layer_size; j++) {
+                error += dedx[layer][j] * network->weights[layer][j][i];
+            }
+            dedx[layer - 1][i] = error * activation_derivative(x[layer - 1][i]);
         }
 
-        for (int i = 0; i < prev_layer_size; i++) {
-            float derrordx = 0.0f;
-            float derrordw = 0.0f;
-            float derrordb = 0.0f;
-            for (int j = 0; j < layer_size; j++) {
-                derrordx += network->weights[layer][j][i] * activation_derivative(x[layer][j]) * (activation(x[layer][j]) - activation(xhat[layer][j]));
-                derrordw = x[layer - 1][i] * activation_derivative(x[layer][j]) * (activation(x[layer][j]) - activation(xhat[layer][j]));
-                derrordb = activation_derivative(x[layer][j]) * (activation(x[layer][j]) - activation(xhat[layer][j]));
-
-                network->weights[layer][j][i] -= learning_rate * error / derrordw;
-                network->biases[layer][j] -= learning_rate * error / derrordb;
+        for (int j = 0; j < layer_size; j++) {
+            for (int k = 0; k < prev_layer_size; k++) {
+                network->weights[layer][j][k] -= learning_rate * dedx[layer][j] * activation(x[layer - 1][k]);
             }
-            xhat[layer - 1][i] = x[layer - 1][i] - error / derrordx; // il peut il y avoir un problème ici, il faut peut-etre diviser l'erreur par le nombre de neurones de la couche précédente
+            network->biases[layer][j] -= learning_rate * dedx[layer][j];
         }
     }
 
-    // Update first layer weights and biases
+    // First layer update
     for (int i = 0; i < network->hidden_layer_sizes[0]; i++) {
-        float derrordw = 0.0f;
-        float derrordb = 0.0f;
         for (int j = 0; j < network->input_size; j++) {
-            derrordw = input[j] * activation_derivative(x[0][i]) * (activation(x[0][i]) - activation(xhat[0][i]));
-            derrordb = activation_derivative(x[0][i]) * (activation(x[0][i]) - activation(xhat[0][i]));
-            network->weights[0][i][j] -= learning_rate * error / derrordw;
-            network->biases[0][i] -= learning_rate * error / derrordb;
+            network->weights[0][i][j] -= learning_rate * dedx[0][i] * input[j];
         }
+        network->biases[0][i] -= learning_rate * dedx[0][i];
     }
 
     for (int i = 0; i < n_layers; i++){
         free(x[i]);
-        free(xhat[i]);
+        free(dedx[i]);
     }
     free(x);
-    free(xhat);
+    free(dedx);
+}
+
+float ReLU(float x) {
+    return ((x > 0) ? 1.0f : 0.1f)*x;
+}
+
+float ReLU_derivative(float x) {
+    return (x > 0) ? 1.0f : 0.1f;
+}
+
+float f(float x) {
+    // crazy non polynomial operations
+    return 0.5f * x * x + 0.3f * x + 0.1f * sin(10.0f * x) + 0.2f * cos(5.0f * x);
+}
+
+// make a quick test of the neural network
+int main() {
+    nn network;
+    int hidden_layer_sizes[] = {100, 100};
+    init_nn(&network, 1, 2, hidden_layer_sizes);
+    
+    // Train the network on f
+    for (int i = 0; i < 10000; i++) {
+        float input = (float)(rand() % 100) / 100.0f; // Random input between 0 and 1
+        network.input[0] = input;
+        // feed_forward(&network, ReLU);
+        
+        float target = f(input);
+        backpropagate(&network, network.input, target, ReLU, ReLU_derivative, 0.01f);
+    }
+
+    // Test the network
+
+    float MSE = 0.0f;
+    for (int i = 0; i < 1000; i++) {
+        float input = (float)(rand() % 100) / 100.0f; // Random input between 0 and 1
+        network.input[0] = input;
+        feed_forward(&network, ReLU);
+        float target = f(input);
+        float error = network.output - target;
+        MSE += error * error / 2.0f;
+    }
+    printf("Mean Squared Error: %.16f\n", MSE / 1000.0f);
+    free_nn(&network);
 }
