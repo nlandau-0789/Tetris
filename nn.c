@@ -1,8 +1,4 @@
-#include "utils/std.h"
-#include "utils/print_epu16.h"
-#include <stdlib.h>
-#include <time.h>
-#include <math.h>
+#include "utils.h"
 
 struct nn {
     float *input;
@@ -201,37 +197,78 @@ float ReLU_derivative(float x) {
 }
 
 float f(float x) {
-    // crazy non polynomial operations
-    return 0.5f * x * x + 0.3f * x + 0.1f * sin(10.0f * x) + 0.2f * cos(5.0f * x);
+    // make the prime counting function using a sieve
+    int y = (int)round(x * 100);
+    int sieve[y + 1];
+    sieve[0] = 0;
+    sieve[1] = 0;
+    sieve[2] = 1;
+    for (int i = 3; i <= y; i++) {
+        sieve[i] = 1; // assume all numbers are prime
+    }
+    for (int i = 2; i * i <= y; i++) {
+        if (sieve[i]) {
+            for (int j = i * i; j <= y; j += i) {
+                sieve[j] = 0; // mark multiples of i as non-prime
+            }
+        }
+    }
+    int count = 0;
+    for (int i = 2; i <= y; i++) {
+        if (sieve[i]) {
+            count++;
+        }
+    }
+    return (float)count;
 }
 
 // make a quick test of the neural network
 int main() {
     nn network;
-    int hidden_layer_sizes[] = {100, 100};
-    init_nn(&network, 1, 2, hidden_layer_sizes);
+    int hidden_layer_sizes[] = {100, 100, 100};
+    init_nn(&network, 1, 3, hidden_layer_sizes);
     
     // Train the network on f
-    for (int i = 0; i < 10000; i++) {
-        float input = (float)(rand() % 100) / 100.0f; // Random input between 0 and 1
-        network.input[0] = input;
-        // feed_forward(&network, ReLU);
-        
-        float target = f(input);
-        backpropagate(&network, network.input, target, ReLU, ReLU_derivative, 0.01f);
+    for (int j = 0; j < 1000; j++) {
+        printf("epoch %d\n", j);
+        for (int i = 0; i < 10000; i++) {
+            float input = (float)(i) / 10000.0f; // Random input between 0 and 1
+            network.input[0] = input;
+            // printf("Input: %.2f, is prime %f\n", input, f(input));
+            // feed_forward(&network, ReLU);
+            
+            float target = f(input);
+            backpropagate(&network, network.input, target, ReLU, ReLU_derivative, 0.0001f);
+            // float MSE = 0.0f;
+            // for (int i = 0; i < 1000; i++) {
+            //     float input = (float)(rand() % 100) / 100.0f; // Random input between 0 and 1
+            //     network.input[0] = input;
+            //     feed_forward(&network, ReLU);
+            //     float target = f(input);
+            //     float error = network.output - target;
+            //     MSE += error * error / 2.0f;
+            // }
+            // printf("Mean Squared Error: %.16f\r", MSE / (float)i);
+        }
     }
 
     // Test the network
-
-    float MSE = 0.0f;
-    for (int i = 0; i < 1000; i++) {
-        float input = (float)(rand() % 100) / 100.0f; // Random input between 0 and 1
-        network.input[0] = input;
+    network.input[0] = 0;
+    feed_forward(&network, ReLU);
+    float prev = network.output;
+    for (int i = 1; i < 100; i++) {
+        // float input = (float)(rand() % 1000000) / 100.0f; // Random input between 0 and 1
+        network.input[0] = (float)i / 100.0f;
         feed_forward(&network, ReLU);
-        float target = f(input);
-        float error = network.output - target;
-        MSE += error * error / 2.0f;
+        // float target = f(input);
+        // float error = network.output - target;
+        // MSE += error * error / 2.0f;
+        // printf("Mean Squared Error: %.16f\r\b\n", MSE / (float)i);
+        // if (network.output-prev >= 0.5f) {
+        //     printf("%d is prime", i);
+        // }
+        printf("%f\n", network.output - f( (float)i / 100.0f));
+        prev = network.output;
     }
-    printf("Mean Squared Error: %.16f\n", MSE / 1000.0f);
     free_nn(&network);
 }
