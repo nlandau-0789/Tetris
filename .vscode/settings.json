@@ -8,6 +8,7 @@
         "streambuf": "c",
         "tuple": "c",
         "type_traits": "c",
-        "functional": "c"
+        "functional": "c",
+        "atomic": "c"
     }
 }

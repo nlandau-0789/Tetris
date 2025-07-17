@@ -305,5 +305,16 @@ __m256i max_all_epi16(__m256i input) {
     return result;
 }
 
+int is_zero_m256i(__m256i vec) {
+    // Compare each element in vec to zero; this will set each element in the result to all 1s (if equal) or all 0s (if not equal)
+    __m256i cmp_result = _mm256_cmpeq_epi32(vec, _mm256_setzero_si256());
+
+    // Check if all comparisons resulted in true (i.e., all elements are zero)
+    uint32_t mask = _mm256_movemask_epi8(cmp_result);
+
+    // If all elements are zero, the mask will be 0xFFFFFFFF
+    return mask == 0xFFFFFFFF;
+}
+
 
 #endif

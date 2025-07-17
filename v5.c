@@ -102,6 +102,24 @@ void calc_consts(__m256i input) {
 
 __m256i placements[7][4];
 int n_rot[7] = {4, 2, 1, 4, 4, 2, 2}; // T, I, O, L, J, S, Z
+int piece_width[7][4] = {
+    {3, 3, 2, 2}, // T
+    {4, 1, 0, 0}, // I
+    {2, 0, 0, 0}, // O
+    {3, 2, 3, 2}, // L
+    {3, 3, 2, 2}, // J
+    {3, 2, 0, 0}, // S
+    {3, 2, 0, 0}  // Z
+};
+int piece_height[7][4] = {
+    {2, 2, 3, 3}, // T
+    {1, 4, 0, 0}, // I
+    {2, 0, 0, 0}, // O
+    {2, 3, 2, 3}, // L
+    {2, 2, 3, 3}, // J
+    {2, 3, 0, 0}, // S
+    {2, 3, 0, 0}  // Z
+};
 
 void init_piece_placements(){
     bool *t = malloc(160 * sizeof(bool));
@@ -115,21 +133,25 @@ void init_piece_placements(){
     t[10 * 15 + 2] = true;
     t[10 * 14 + 1] = true;
     placements[0][0] = board_from_array(t);
+    // print_board(placementsnts[0][0]);
     t[10 * 15 + 0] = false;
     t[10 * 15 + 2] = false;
     t[10 * 14 + 0] = true;
     t[10 * 14 + 2] = true;
     placements[0][1] = board_from_array(t);
+    // print_board(placementsnts[0][1]);
     t[10 * 15 + 1] = false;
     t[10 * 14 + 2] = false;
     t[10 * 15 + 0] = true;
     t[10 * 13 + 0] = true;
     placements[0][2] = board_from_array(t);
+    // print_board(placementsnts[0][2]);
     t[10 * 15 + 1] = true;
     t[10 * 13 + 1] = true;
     t[10 * 15 + 0] = false;
     t[10 * 13 + 0] = false;
     placements[0][3] = board_from_array(t);
+    // print_board(placementsnts[0][3]);
     
     t[10 * 15 + 1] = false;
     t[10 * 14 + 0] = false;
@@ -142,6 +164,7 @@ void init_piece_placements(){
     t[10 * 15 + 2] = true;
     t[10 * 15 + 3] = true;
     placements[1][0] = board_from_array(t);
+    // print_board(placementsnts[1][0]);
     t[10 * 15 + 1] = false;
     t[10 * 15 + 2] = false;
     t[10 * 15 + 3] = false;
@@ -149,6 +172,7 @@ void init_piece_placements(){
     t[10 * 13 + 0] = true;
     t[10 * 12 + 0] = true;
     placements[1][1] = board_from_array(t);
+    // print_board(placementsnts[1][1]);
     t[10 * 15 + 0] = false;
     t[10 * 14 + 0] = false;
     t[10 * 13 + 0] = false;
@@ -160,6 +184,7 @@ void init_piece_placements(){
     t[10 * 14 + 0] = true;
     t[10 * 14 + 1] = true;
     placements[2][0] = board_from_array(t);
+    // print_board(placementsnts[2][0]);
     t[10 * 15 + 0] = false;
     t[10 * 15 + 1] = false;
     t[10 * 14 + 0] = false;
@@ -171,11 +196,13 @@ void init_piece_placements(){
     t[10 * 15 + 2] = true;
     t[10 * 14 + 0] = true;
     placements[3][0] = board_from_array(t);
+    // print_board(placementsnts[3][0]);
     t[10 * 15 + 1] = false;
     t[10 * 15 + 2] = false;
     t[10 * 13 + 0] = true;
     t[10 * 13 + 1] = true;
     placements[3][1] = board_from_array(t);
+    // print_board(placementsnts[3][1]);
     t[10 * 15 + 0] = false;
     t[10 * 13 + 0] = false;
     t[10 * 13 + 1] = false;
@@ -183,6 +210,7 @@ void init_piece_placements(){
     t[10 * 14 + 2] = true;
     t[10 * 15 + 2] = true;
     placements[3][2] = board_from_array(t);
+    // print_board(placementsnts[3][2]);
     t[10 * 15 + 0] = true;
     t[10 * 15 + 1] = true;
     t[10 * 15 + 2] = false;
@@ -190,6 +218,7 @@ void init_piece_placements(){
     t[10 * 14 + 0] = false;
     t[10 * 13 + 1] = true;
     placements[3][3] = board_from_array(t);
+    // print_board(placementsnts[3][3]);
 
     t[10 * 15 + 0] = false;
     t[10 * 15 + 1] = false;
@@ -202,21 +231,25 @@ void init_piece_placements(){
     t[10 * 15 + 2] = true;
     t[10 * 14 + 2] = true;
     placements[4][0] = board_from_array(t);
+    // print_board(placementsnts[4][0]);
     t[10 * 15 + 1] = false;
     t[10 * 15 + 2] = false;
     t[10 * 14 + 0] = true;
     t[10 * 14 + 1] = true;
     placements[4][1] = board_from_array(t);
+    // print_board(placementsnts[4][1]);
     t[10 * 14 + 1] = false;
     t[10 * 14 + 2] = false;
     t[10 * 15 + 1] = true;
     t[10 * 13 + 0] = true;
     placements[4][2] = board_from_array(t);
+    // print_board(placementsnts[4][2]);
     t[10 * 15 + 0] = false;
     t[10 * 14 + 0] = false;
     t[10 * 14 + 1] = true;
     t[10 * 13 + 1] = true;
     placements[4][3] = board_from_array(t);
+    // print_board(placementsnts[4][3]);
 
     t[10 * 15 + 1] = false;
     t[10 * 14 + 1] = false;
@@ -229,11 +262,13 @@ void init_piece_placements(){
     t[10 * 14 + 0] = true;
     t[10 * 14 + 1] = true;
     placements[5][0] = board_from_array(t);
+    // print_board(placementsnts[5][0]);
     t[10 * 15 + 1] = false;
     t[10 * 15 + 2] = false;
     t[10 * 15 + 0] = true;
     t[10 * 13 + 1] = true;
     placements[5][1] = board_from_array(t);
+    // print_board(placementsnts[5][1]);
 
     t[10 * 15 + 0] = false;
     t[10 * 14 + 0] = false;
@@ -246,16 +281,77 @@ void init_piece_placements(){
     t[10 * 14 + 1] = true;
     t[10 * 14 + 2] = true;
     placements[6][0] = board_from_array(t);
+    // print_board(placementsnts[6][0]);
     t[10 * 15 + 0] = false;
     t[10 * 14 + 2] = false;
     t[10 * 14 + 0] = true;
     t[10 * 13 + 0] = true;
     placements[6][1] = board_from_array(t);
+    // print_board(placementsnts[6][1]);
 
     free(t);
 }
 
+struct placement {
+    int x, r;
+};
+
+typedef struct placement placement;
+
+#include "nn.c"
+
+placement get_placement(int piece, __m256i board, nn *network) {
+    float best_eval = 0.0f;
+    placement best_placement = {0, 0};
+    for (int r = 0; r < n_rot[piece]; r++) {
+        __m256i piece_board_init = placements[piece][r];
+        for (int x = 0; x < 10-piece_width[piece][r]+1; x++) { // potential +/-1 mistake
+            int y = 16;
+            __m256i piece_board = piece_board_init;
+            if (!is_zero_m256i(_mm256_and_si256(piece_board, board))){
+                continue; // piece overlaps with board
+            }
+            while (y > piece_height[piece][r] && !is_zero_m256i(_mm256_and_si256(_mm256_srli_epi16(piece_board, 1), board))){ // potential +/-1 mistake
+                y--;
+                piece_board = _mm256_srli_epi16(piece_board, 1);
+            }
+
+            // evaluate the placement
+            __m256i new_board = _mm256_or_si256(board, piece_board);
+            calc_consts(new_board);
+
+            // put consts in the nn input
+            short input_short[160];
+            for (int i = 0; i < 10; i++) {
+                _mm256_storeu_si256((__m256i*)(&input_short[i*16]), consts[i]);
+            }
+            float input[160];
+            for (int i = 0; i < 160; i++) {
+                input[i] = (float)input_short[i];
+            }
+
+            // run the nn
+            float *save_old_input = network->input;
+            network->input = input;
+            feed_forward(network, ReLU);
+            float eval = network->output;
+            network->input = save_old_input;
+
+            if (eval > best_eval) { // if the evaluation is good enough
+                best_eval = eval;
+                best_placement.x = x;
+                best_placement.r = r;
+            }
+            
+            piece_board_init = rotate_right_one(piece_board_init);
+        }
+    }
+    return best_placement;
+}
+
 int main(){
+    init_piece_placements();
+
     // bool *t = aligned_alloc(32, 160 * sizeof(bool));
     bool *t = malloc(160 * sizeof(bool));
     if (!t) {
@@ -301,6 +397,5 @@ int main(){
     print_m256i_as_int16(consts[9]);
 
 
-    init_piece_placements();
     return 0;
 }

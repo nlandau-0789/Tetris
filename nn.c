@@ -223,6 +223,7 @@ float f(float x) {
 }
 
 // make a quick test of the neural network
+#ifdef TEST_NN
 int main() {
     nn network;
     int hidden_layer_sizes[] = {100, 100, 100};
@@ -272,3 +273,4 @@ int main() {
     }
     free_nn(&network);
 }
+#endif
