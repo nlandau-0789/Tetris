@@ -316,5 +316,45 @@ int is_zero_m256i(__m256i vec) {
     return mask == 0xFFFFFFFF;
 }
 
+struct _m256i_vector {
+    __m256i *data;
+    size_t size;
+    size_t capacity;
+};
+
+typedef struct _m256i_vector _m256i_vector;
+
+_m256i_vector init_mm256i_vector(size_t capacity) {
+    _m256i_vector vec;
+    vec.data = (__m256i *)malloc(capacity * sizeof(__m256i));
+    vec.size = 0;
+    vec.capacity = capacity;
+    return vec;
+}
+
+void free_mm256i_vector(_m256i_vector *vec) {
+    free(vec->data);
+    vec->size = 0;
+    vec->capacity = 0;
+    vec->data = NULL;
+}
+
+void append_mm256i_vector(_m256i_vector *vec, __m256i value) {
+    if (vec->size >= vec->capacity) {
+        vec->capacity *= 2;
+        vec->data = (__m256i *)realloc(vec->data, vec->capacity * sizeof(__m256i));
+    }
+    vec->data[vec->size] = value;
+    vec->size++;
+}
+
+__m256i pop_m256i_vector(_m256i_vector *vec) {
+    if (vec->size == 0) {
+        fprintf(stderr, "Error: Attempt to pop from an empty vector.\n");
+        exit(EXIT_FAILURE);
+    }
+    vec->size--;
+    return vec->data[vec->size];
+}
 
 #endif

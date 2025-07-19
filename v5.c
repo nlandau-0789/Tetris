@@ -292,17 +292,57 @@ void init_piece_placements(){
     free(t);
 }
 
-struct placement {
+struct placement_and_status {
     int x, r;
+    float eval;
+    bool dead;
 };
 
-typedef struct placement placement;
+typedef struct placement_and_status placement_and_status;
 
 #include "nn.c"
 
-placement get_placement(int piece, __m256i board, nn *network) {
+void remove_full_lines(__m256i *board) {
+    __m256i full_lines = *board;
+    full_lines = _mm256_and_si256(full_lines, rotate_right(full_lines, 11));
+    full_lines = _mm256_and_si256(full_lines, rotate_right(full_lines, 14));
+    full_lines = _mm256_and_si256(full_lines, rotate_left_one(full_lines));
+    full_lines = _mm256_and_si256(full_lines, rotate_left_one(full_lines));
+
+    short full_lines_mask = _mm256_extract_epi16(full_lines, 0);
+    for (int i = 15; i >= 0; i--) {
+        if (full_lines_mask & (1 << i)) {
+            // remove the line
+            __m256i top = _mm256_slli_epi16(_mm256_srli_epi16(*board, i+1), i);
+            // print_board(top);
+            __m256i bottom = _mm256_srli_epi16(_mm256_slli_epi16(*board, 16-i), 16-i);
+            // print_board(bottom);
+            *board = _mm256_or_si256(top, bottom); // insert a new empty line at the top
+        }
+    }
+}
+
+__m256i place(int piece, int x, int r, __m256i board) {
+    __m256i piece_board = placements[piece][r];
+    for (int i = 0; i < x; i++) {
+        piece_board = rotate_right_one(piece_board);
+    }
+    int y = 16;
+    while (y > piece_height[piece][r] && is_zero_m256i(_mm256_and_si256(_mm256_srli_epi16(piece_board, 1), board))){ // potential +/-1 mistake
+        y--;
+        piece_board = _mm256_srli_epi16(piece_board, 1);
+        // print_board(piece_board);
+    }
+
+    // evaluate the placement
+    __m256i new_board = _mm256_or_si256(board, piece_board);
+    remove_full_lines(&new_board);
+    return new_board;
+}
+
+placement_and_status get_placement(int piece, __m256i board, nn *network) {
     float best_eval = 0.0f;
-    placement best_placement = {0, 0};
+    placement_and_status best_placement = {0, 0, 0, true};
     for (int r = 0; r < n_rot[piece]; r++) {
         __m256i piece_board_init = placements[piece][r];
         for (int x = 0; x < 10-piece_width[piece][r]+1; x++) { // potential +/-1 mistake
@@ -311,13 +351,14 @@ placement get_placement(int piece, __m256i board, nn *network) {
             if (!is_zero_m256i(_mm256_and_si256(piece_board, board))){
                 continue; // piece overlaps with board
             }
-            while (y > piece_height[piece][r] && !is_zero_m256i(_mm256_and_si256(_mm256_srli_epi16(piece_board, 1), board))){ // potential +/-1 mistake
+            while (y > piece_height[piece][r] && is_zero_m256i(_mm256_and_si256(_mm256_srli_epi16(piece_board, 1), board))){ // potential +/-1 mistake
                 y--;
                 piece_board = _mm256_srli_epi16(piece_board, 1);
             }
 
             // evaluate the placement
             __m256i new_board = _mm256_or_si256(board, piece_board);
+            remove_full_lines(&new_board);
             calc_consts(new_board);
 
             // put consts in the nn input
@@ -337,10 +378,12 @@ placement get_placement(int piece, __m256i board, nn *network) {
             float eval = network->output;
             network->input = save_old_input;
 
-            if (eval > best_eval) { // if the evaluation is good enough
+            if (eval > best_eval) {
                 best_eval = eval;
                 best_placement.x = x;
                 best_placement.r = r;
+                best_placement.eval = eval;
+                best_placement.dead = false;
             }
             
             piece_board_init = rotate_right_one(piece_board_init);
@@ -349,9 +392,63 @@ placement get_placement(int piece, __m256i board, nn *network) {
     return best_placement;
 }
 
-int main(){
-    init_piece_placements();
+int train(nn *network, __m256i board, float learning_rate, int piece, int n_turns) {
+    int next_piece = rand() % 7;
+    // print_board(board);
+    int max_depth = 0;
+    for (int r = 0; r < n_rot[piece]; r++) {
+        __m256i piece_board_init = placements[piece][r];
+        for (int x = 0; x < 10-piece_width[piece][r]+1; x++) {
+            printf("%d\r", n_turns);
+            int y = 16;
+            __m256i piece_board = piece_board_init;
+            if (!is_zero_m256i(_mm256_and_si256(piece_board, board))){
+                piece_board_init = rotate_right_one(piece_board_init);
+                continue;
+            }
+            while (y > piece_height[piece][r] && is_zero_m256i(_mm256_and_si256(_mm256_srli_epi16(piece_board, 1), board))){
+                y--;
+                piece_board = _mm256_srli_epi16(piece_board, 1);
+            }
 
+            __m256i new_board = _mm256_or_si256(board, piece_board);
+            remove_full_lines(&new_board);
+            int depth = train(network, new_board, learning_rate, next_piece, n_turns + 1);
+
+            calc_consts(new_board);
+            short input_short[160];
+            for (int i = 0; i < 10; i++) {
+                _mm256_storeu_si256((__m256i*)(&input_short[i*16]), consts[i]);
+            }
+            float input[160];
+            for (int i = 0; i < 160; i++) {
+                input[i] = (float)input_short[i];
+            }
+
+            if (depth + 1 > max_depth) {
+                max_depth = depth + 1;
+            }
+            
+            piece_board_init = rotate_right_one(piece_board_init);
+        }
+    }
+    if (max_depth > 3) {
+        // no valid placements, game over
+        calc_consts(board);
+        short input_short[160];
+        for (int i = 0; i < 10; i++) {
+            _mm256_storeu_si256((__m256i*)(&input_short[i*16]), consts[i]);
+        }
+        float input[160];
+        for (int i = 0; i < 160; i++) {
+            input[i] = (float)input_short[i];
+        }
+        backpropagate(network, input, 1.0 - exp(-max_depth/50), ReLU, ReLU_derivative, learning_rate);
+    }
+    return max_depth;
+}
+
+int test_board() {
     // bool *t = aligned_alloc(32, 160 * sizeof(bool));
     bool *t = malloc(160 * sizeof(bool));
     if (!t) {
@@ -396,6 +493,27 @@ int main(){
     print_m256i_as_int16(consts[8]);
     print_m256i_as_int16(consts[9]);
 
+    for (int i = 0; i < 10; i++) {
+        t[10*3 + i] = true;
+        t[10*4 + i] = true;
+        t[10*7 + i] = true;
+    }
+    board = board_from_array(t);
+    remove_full_lines(&board);
+    print_board(board);
 
     return 0;
 }
+
+int main(){
+    init_piece_placements();
+
+    nn network;
+    int n_hidden_layers = 3;
+    int hidden_layer_sizes[] = {20, 20, 20};
+    init_nn(&network, 160, n_hidden_layers, hidden_layer_sizes);
+
+
+    train(&network, ZERO, 0.0001f, rand() % 7, 0);
+}
+
