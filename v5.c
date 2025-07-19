@@ -393,16 +393,34 @@ placement_and_status get_placement(int piece, __m256i board, nn *network) {
 }
 
 int train(nn *network, __m256i board, float learning_rate, int piece, int n_turns) {
+    printf("%d\r", n_turns);
+    fflush(stdout);
+    if (n_turns > 1200) {
+        return 69;
+    }
+    if (n_turns > 1267) {
+        printf("[train] Enter: n_turns=%d, piece=%d\n", n_turns, piece);
+        fflush(stdout);
+    }
+
     int next_piece = rand() % 7;
-    // print_board(board);
     int max_depth = 0;
+
     for (int r = 0; r < n_rot[piece]; r++) {
         __m256i piece_board_init = placements[piece][r];
         for (int x = 0; x < 10-piece_width[piece][r]+1; x++) {
-            printf("%d\r", n_turns);
+            if (n_turns > 1267) {
+                printf("[train] Trying piece=%d, rot=%d, x=%d, n_turns=%d\n", piece, r, x, n_turns);
+                fflush(stdout);
+            }
+
             int y = 16;
             __m256i piece_board = piece_board_init;
             if (!is_zero_m256i(_mm256_and_si256(piece_board, board))){
+                if (n_turns > 1267) {
+                    printf("[train] Overlap detected, skipping\n");
+                    fflush(stdout);
+                }
                 piece_board_init = rotate_right_one(piece_board_init);
                 continue;
             }
@@ -413,7 +431,17 @@ int train(nn *network, __m256i board, float learning_rate, int piece, int n_turn
 
             __m256i new_board = _mm256_or_si256(board, piece_board);
             remove_full_lines(&new_board);
+
+            if (n_turns > 1267) {
+                printf("[train] Recursing: next_piece=%d, n_turns+1=%d\n", next_piece, n_turns+1);
+                fflush(stdout);
+            }
             int depth = train(network, new_board, learning_rate, next_piece, n_turns + 1);
+
+            if (n_turns > 1267) {
+                printf("[train] Returned from recursion: depth=%d\n", depth);
+                fflush(stdout);
+            }
 
             calc_consts(new_board);
             short input_short[160];
@@ -432,8 +460,16 @@ int train(nn *network, __m256i board, float learning_rate, int piece, int n_turn
             piece_board_init = rotate_right_one(piece_board_init);
         }
     }
+    if (n_turns > 1267) {
+        printf("[train] After placements: max_depth=%d, n_turns=%d\n", max_depth, n_turns);
+        fflush(stdout);
+    }
+
     if (max_depth > 3) {
-        // no valid placements, game over
+        if (n_turns > 1267) {
+            printf("[train] Backpropagating at n_turns=%d, max_depth=%d\n", n_turns, max_depth);
+            fflush(stdout);
+        }
         calc_consts(board);
         short input_short[160];
         for (int i = 0; i < 10; i++) {
@@ -444,6 +480,14 @@ int train(nn *network, __m256i board, float learning_rate, int piece, int n_turn
             input[i] = (float)input_short[i];
         }
         backpropagate(network, input, 1.0 - exp(-max_depth/50), ReLU, ReLU_derivative, learning_rate);
+        if (n_turns > 1267) {
+            printf("[train] Backpropagation done\n");
+            fflush(stdout);
+        }
+    }
+    if (n_turns > 1267) {
+        printf("[train] Returning max_depth=%d at n_turns=%d\n", max_depth, n_turns);
+        fflush(stdout);
     }
     return max_depth;
 }
@@ -515,5 +559,7 @@ int main(){
 
 
     train(&network, ZERO, 0.0001f, rand() % 7, 0);
+
+    printf("Training complete.\n");
 }
 
