@@ -30,22 +30,22 @@ void init_nn(nn* network, int input_size, int n_hidden_layers, int* hidden_layer
         int last_layer_size = (i == 0) ? input_size : hidden_layer_sizes[i - 1];
         for (int j = 0; j < layer_size; j++) {
             network->weights[i][j] = (float*)malloc(last_layer_size * sizeof(float));
-            // Initialize weights with random values
+            // Initialize weights with random values in [-0.01, 0.01]
             for (int k = 0; k < last_layer_size; k++) {
-                network->weights[i][j][k] = ((float)rand() / RAND_MAX) - 0.5f;
+                network->weights[i][j][k] = ((float)rand() / RAND_MAX) * 0.02f - 0.01f;
             }
         }
         network->biases[i] = (float*)malloc(layer_size * sizeof(float));
-        // Initialize biases with random values
+        // Initialize biases with random values in [-0.01, 0.01]
         for (int j = 0; j < layer_size; j++) {
-            network->biases[i][j] = ((float)rand() / RAND_MAX) - 0.5f;
+            network->biases[i][j] = ((float)rand() / RAND_MAX) * 0.02f - 0.01f;
         }
     }
 
-    // Output weights
+    // Output weights in [-0.01, 0.01]
     int last_layer_size = hidden_layer_sizes[n_hidden_layers - 1];
     for (int k = 0; k < last_layer_size; k++) {
-        network->output_weights[k] = ((float)rand() / RAND_MAX) - 0.5f;
+        network->output_weights[k] = ((float)rand() / RAND_MAX) * 0.02f - 0.01f;
     }
 }
 

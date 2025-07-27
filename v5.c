@@ -302,13 +302,14 @@ typedef struct placement_and_status placement_and_status;
 
 #include "nn.c"
 
-void remove_full_lines(__m256i *board) {
+int remove_full_lines(__m256i *board) {
     __m256i full_lines = *board;
     full_lines = _mm256_and_si256(full_lines, rotate_right(full_lines, 11));
     full_lines = _mm256_and_si256(full_lines, rotate_right(full_lines, 14));
     full_lines = _mm256_and_si256(full_lines, rotate_left_one(full_lines));
     full_lines = _mm256_and_si256(full_lines, rotate_left_one(full_lines));
 
+    int n_lines_removed = 0;
     short full_lines_mask = _mm256_extract_epi16(full_lines, 0);
     for (int i = 15; i >= 0; i--) {
         if (full_lines_mask & (1 << i)) {
@@ -318,11 +319,13 @@ void remove_full_lines(__m256i *board) {
             __m256i bottom = _mm256_srli_epi16(_mm256_slli_epi16(*board, 16-i), 16-i);
             // print_board(bottom);
             *board = _mm256_or_si256(top, bottom); // insert a new empty line at the top
+            n_lines_removed++;
         }
     }
+    return n_lines_removed;
 }
 
-__m256i place(int piece, int x, int r, __m256i board) {
+__m256i place(int piece, int x, int r, __m256i board, int *n_lines_removed) {
     __m256i piece_board = placements[piece][r];
     for (int i = 0; i < x; i++) {
         piece_board = rotate_right_one(piece_board);
@@ -336,12 +339,12 @@ __m256i place(int piece, int x, int r, __m256i board) {
 
     // evaluate the placement
     __m256i new_board = _mm256_or_si256(board, piece_board);
-    remove_full_lines(&new_board);
+    *n_lines_removed = remove_full_lines(&new_board);
     return new_board;
 }
 
 placement_and_status get_placement(int piece, __m256i board, nn *network) {
-    float best_eval = 0.0f;
+    float best_eval = -INFINITY;
     placement_and_status best_placement = {0, 0, 0, true};
     for (int r = 0; r < n_rot[piece]; r++) {
         __m256i piece_board_init = placements[piece][r];
@@ -392,35 +395,79 @@ placement_and_status get_placement(int piece, __m256i board, nn *network) {
     return best_placement;
 }
 
-int train(nn *network, __m256i board, float learning_rate, int piece, int n_turns) {
-    printf("%d\r", n_turns);
-    fflush(stdout);
-    if (n_turns > 1200) {
-        return 69;
-    }
-    if (n_turns > 1267) {
-        printf("[train] Enter: n_turns=%d, piece=%d\n", n_turns, piece);
-        fflush(stdout);
-    }
+placement_and_status logged_get_placement(int piece, __m256i board, nn *network) {
+    float best_eval = -INFINITY;
+    placement_and_status best_placement = {0, 0, 0, true};
+    for (int r = 0; r < n_rot[piece]; r++) {
+        __m256i piece_board_init = placements[piece][r];
+        for (int x = 0; x < 10-piece_width[piece][r]+1; x++) { // potential +/-1 mistake
+            printf("Trying piece %d, rotation %d, x=%d\n", piece, r, x);
+            int y = 16;
+            __m256i piece_board = piece_board_init;
+            if (!is_zero_m256i(_mm256_and_si256(piece_board, board))){
+                print_board(board);
+                print_board(piece_board);
+                printf("Piece overlaps with board at x=%d, r=%d\n", x, r);
+                continue; // piece overlaps with board
+            }
+            while (y > piece_height[piece][r] && is_zero_m256i(_mm256_and_si256(_mm256_srli_epi16(piece_board, 1), board))){ // potential +/-1 mistake
+                y--;
+                piece_board = _mm256_srli_epi16(piece_board, 1);
+            }
 
+            // evaluate the placement
+            __m256i new_board = _mm256_or_si256(board, piece_board);
+            remove_full_lines(&new_board);
+            calc_consts(new_board);
+
+            // put consts in the nn input
+            short input_short[160];
+            for (int i = 0; i < 10; i++) {
+                _mm256_storeu_si256((__m256i*)(&input_short[i*16]), consts[i]);
+            }
+            float input[160];
+            for (int i = 0; i < 160; i++) {
+                input[i] = (float)input_short[i];
+            }
+
+            // run the nn
+            float *save_old_input = network->input;
+            network->input = input;
+            feed_forward(network, ReLU);
+            float eval = network->output;
+            network->input = save_old_input;
+
+            if (eval > best_eval) {
+                best_eval = eval;
+                best_placement.x = x;
+                best_placement.r = r;
+                best_placement.eval = eval;
+                best_placement.dead = false;
+            }
+            
+            piece_board_init = rotate_right_one(piece_board_init);
+        }
+    }
+    return best_placement;
+}
+
+
+bool stop_train = false;
+int train(nn *network, __m256i board, float learning_rate, int piece, int n_turns) {
     int next_piece = rand() % 7;
     int max_depth = 0;
+
+    if (n_turns > 1000 || stop_train) {
+        stop_train = true;
+        return 0; // stop training if too many turns or stop signal
+    }
 
     for (int r = 0; r < n_rot[piece]; r++) {
         __m256i piece_board_init = placements[piece][r];
         for (int x = 0; x < 10-piece_width[piece][r]+1; x++) {
-            if (n_turns > 1267) {
-                printf("[train] Trying piece=%d, rot=%d, x=%d, n_turns=%d\n", piece, r, x, n_turns);
-                fflush(stdout);
-            }
-
             int y = 16;
             __m256i piece_board = piece_board_init;
             if (!is_zero_m256i(_mm256_and_si256(piece_board, board))){
-                if (n_turns > 1267) {
-                    printf("[train] Overlap detected, skipping\n");
-                    fflush(stdout);
-                }
                 piece_board_init = rotate_right_one(piece_board_init);
                 continue;
             }
@@ -432,16 +479,7 @@ int train(nn *network, __m256i board, float learning_rate, int piece, int n_turn
             __m256i new_board = _mm256_or_si256(board, piece_board);
             remove_full_lines(&new_board);
 
-            if (n_turns > 1267) {
-                printf("[train] Recursing: next_piece=%d, n_turns+1=%d\n", next_piece, n_turns+1);
-                fflush(stdout);
-            }
             int depth = train(network, new_board, learning_rate, next_piece, n_turns + 1);
-
-            if (n_turns > 1267) {
-                printf("[train] Returned from recursion: depth=%d\n", depth);
-                fflush(stdout);
-            }
 
             calc_consts(new_board);
             short input_short[160];
@@ -453,6 +491,8 @@ int train(nn *network, __m256i board, float learning_rate, int piece, int n_turn
                 input[i] = (float)input_short[i];
             }
 
+            backpropagate(network, input, 1.0 - exp(-depth/50), ReLU, ReLU_derivative, learning_rate);
+
             if (depth + 1 > max_depth) {
                 max_depth = depth + 1;
             }
@@ -460,16 +500,8 @@ int train(nn *network, __m256i board, float learning_rate, int piece, int n_turn
             piece_board_init = rotate_right_one(piece_board_init);
         }
     }
-    if (n_turns > 1267) {
-        printf("[train] After placements: max_depth=%d, n_turns=%d\n", max_depth, n_turns);
-        fflush(stdout);
-    }
 
     if (max_depth > 3) {
-        if (n_turns > 1267) {
-            printf("[train] Backpropagating at n_turns=%d, max_depth=%d\n", n_turns, max_depth);
-            fflush(stdout);
-        }
         calc_consts(board);
         short input_short[160];
         for (int i = 0; i < 10; i++) {
@@ -480,14 +512,6 @@ int train(nn *network, __m256i board, float learning_rate, int piece, int n_turn
             input[i] = (float)input_short[i];
         }
         backpropagate(network, input, 1.0 - exp(-max_depth/50), ReLU, ReLU_derivative, learning_rate);
-        if (n_turns > 1267) {
-            printf("[train] Backpropagation done\n");
-            fflush(stdout);
-        }
-    }
-    if (n_turns > 1267) {
-        printf("[train] Returning max_depth=%d at n_turns=%d\n", max_depth, n_turns);
-        fflush(stdout);
     }
     return max_depth;
 }
@@ -549,16 +573,178 @@ int test_board() {
     return 0;
 }
 
+
+float max_reward = -INFINITY;
+float min_reward = INFINITY;
+float compute_reward(__m256i old_board, __m256i new_board, int n_lines_removed) {
+    // Reward for clearing lines
+    float line_reward = 0.0f;
+    if (n_lines_removed == 1) line_reward = 50.0f;
+    else if (n_lines_removed == 2) line_reward = 90.0f;
+    else if (n_lines_removed == 3) line_reward = 100.0f;
+    else if (n_lines_removed == 4) line_reward = 110.0f;
+
+    // Penalty for holes
+    calc_consts(new_board);
+    short holes_new = 0;
+    for (int i = 0; i < 10; i++) {
+        holes_new += ((short*)&consts[2])[i];
+    }
+
+    // Penalty for height (use same consts call)
+    short max_height = ((short*)&consts[1])[0];
+    for (int i = 1; i < 10; i++) {
+        if (((short*)&consts[1])[i] > max_height)
+            max_height = ((short*)&consts[1])[i];
+    }
+
+    float height_penalty = (float)max_height * 2.0f;
+
+    // Now compute holes in old_board
+    calc_consts(old_board);
+    short holes_old = 0;
+    for (int i = 0; i < 10; i++) {
+        holes_old += ((short*)&consts[2])[i];
+    }
+
+    float hole_penalty = (float)(holes_new - holes_old) * 4.0f;
+
+    // Total reward
+    float reward = line_reward - hole_penalty - height_penalty;
+    reward /= 200.0f;
+    if (reward > max_reward) {
+        max_reward = reward;
+    }
+    if (reward < min_reward) {
+        min_reward = reward;
+    }
+    return n_lines_removed;
+}
+
+void get_nn_input(float input[], __m256i board) {
+    calc_consts(board);
+    short input_short[160];
+    for (int i = 0; i < 10; i++) {
+        _mm256_storeu_si256((__m256i*)(&input_short[i*16]), consts[i]);
+    }
+    for (int i = 0; i < 160; i++) {
+        input[i] = (float)input_short[i] / 16.0f;
+    }
+}
+
+void rl_train(nn *network, int episodes, float learning_rate, float gamma, float epsilon) {
+    int total_lines_removed = 0;
+    float threshold_lines = 1000;
+    for (int ep = 0; ep < episodes; ep++) {
+        // Start with an empty board
+        __m256i board = ZERO;
+        float total_reward = 0;
+        int turn = 0;
+        int last_piece;
+        
+        while (turn < 1000) {
+            int piece = rand() % 7;
+            last_piece = piece;
+
+            // Epsilon-greedy: random move or best move
+            placement_and_status best;
+            if (((float)rand() / RAND_MAX) < epsilon) {
+                // Random action
+                int r = rand() % n_rot[piece];
+                int x = rand() % (10 - piece_width[piece][r] + 1);
+                // check if the piece can be placed
+                __m256i piece_board = placements[piece][r];
+                best.x = x;
+                best.r = r;
+                best.dead = false;
+                for (int i = 0; i < x; i++) {
+                    piece_board = rotate_right_one(piece_board);
+                }
+                if (!is_zero_m256i(_mm256_and_si256(piece_board, board))){
+                    best.dead = true; // piece overlaps with board
+                }
+            } else {
+                // Greedy action (use NN)
+                best = get_placement(piece, board, network);
+            }
+
+            // Place the piece
+            float reward = 0;
+            if (best.dead) {
+                reward = -100;
+                total_reward += reward;
+                float target = -100;
+
+                float input[160];
+                get_nn_input(input, board);
+                backpropagate(network, input, target, ReLU, ReLU_derivative, learning_rate);
+                break;
+            }
+            int n_lines_removed;
+            __m256i new_board = place(piece, best.x, best.r, board, &n_lines_removed);
+            reward = compute_reward(board, new_board, n_lines_removed);
+            total_reward += reward;
+            total_lines_removed += n_lines_removed;
+
+            // Prepare NN input for current state
+            float input[160], next_input[160];
+            get_nn_input(input, board);
+            get_nn_input(next_input, new_board);
+
+            // Q-learning target: reward + gamma * max_a' Q(next_state, a')
+            network->input = next_input;
+            if (isnan(network->output) || fabs(network->output) > 1e6) {
+                printf("Network output unstable: %f\n", network->output);
+                exit(1);
+            }
+            feed_forward(network, ReLU);
+            float next_value = (network->output);
+
+            float target = (reward + gamma * next_value);
+            if (target > 1000.0f) target = 1000.0f;
+            if (target < -1000.0f) target = -1000.0f;
+
+            // Train on (state, target)
+            backpropagate(network, input, target, ReLU, ReLU_derivative, learning_rate);
+
+            // Move to next state
+            board = new_board;
+            turn++;
+        }
+        if (turn == 0) {
+            logged_get_placement(last_piece, board, network);
+        }
+        if ((ep + 1) % 500 == 0) {
+            printf("\rEpisode %d finished, min=%f, max=%f, total_lr=%d        ", ep+1, min_reward, max_reward, total_lines_removed);
+            fflush(stdout);
+            total_lines_removed = 0;
+        } 
+        epsilon *= 0.9999;
+        gamma *= 1.0004;
+        if (epsilon < 0.1) {
+            epsilon = 0.1; // minimum epsilon
+        }
+        if (gamma > 0.99) {
+            gamma = 0.99; // maximum gamma
+        }
+        if (total_lines_removed > threshold_lines) {
+            learning_rate *= 0.9;
+            threshold_lines *= 3;
+        }
+    }
+}
+
 int main(){
     init_piece_placements();
 
     nn network;
-    int n_hidden_layers = 3;
-    int hidden_layer_sizes[] = {20, 20, 20};
+    int n_hidden_layers = 2;
+    int hidden_layer_sizes[] = {32, 32};
     init_nn(&network, 160, n_hidden_layers, hidden_layer_sizes);
 
 
-    train(&network, ZERO, 0.0001f, rand() % 7, 0);
+    // train(&network, ZERO, 0.0001f, rand() % 7, 0);
+    rl_train(&network, 10000000, 0.0001f, 0.1f, 0.25f);
 
     printf("Training complete.\n");
 }

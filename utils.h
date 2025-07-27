@@ -263,7 +263,7 @@ __m256i log2_epi16(__m256i input) {
 
 __m256i btc_epi16(__m256i input) {
     __m256i result = _mm256_setzero_si256();
-    __m256i zero = _mm256_setzero_si256();
+    // __m256i zero = _mm256_setzero_si256();
     __m256i one = _mm256_set1_epi16(1);
 
     for (int i = 0; i < 16; i++) {
