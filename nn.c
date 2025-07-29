@@ -13,7 +13,10 @@ typedef struct nn nn;
 void init_nn(nn* network, int input_size, int n_hidden_layers, int* hidden_layer_sizes) {
     network->input_size = input_size;
     network->n_hidden_layers = n_hidden_layers;
-    network->hidden_layer_sizes = hidden_layer_sizes;
+    network->hidden_layer_sizes = (int*)malloc(n_hidden_layers * sizeof(int));
+    for (int i = 0; i < n_hidden_layers; i++) {
+        network->hidden_layer_sizes[i] = hidden_layer_sizes[i];
+    }
 
     // Allocate memory for inputs, outputs, weights, and biases
     network->input = (float*)malloc(input_size * sizeof(float));
@@ -60,12 +63,11 @@ void free_nn(nn* network) {
     }
     free(network->weights);
     free(network->biases);
-    if (network->input) {
-        free(network->input);
-    }
-    if (network->output_weights) {
-        free(network->output_weights);
-    }
+    free(network->hidden_layer_sizes);
+    free(network->output_weights);
+    // if (network->input) {
+    //     free(network->input);
+    // }
 }
 
 void feed_forward(nn* network, float (*activation)(float)) {
@@ -220,6 +222,24 @@ float f(float x) {
         }
     }
     return (float)count;
+}
+
+void weight_avg_nn(nn *network, nn *other_network, float alpha) {
+    // Average the weights and biases of two networks
+    for (int i = 0; i < network->n_hidden_layers; i++) {
+        int layer_size = network->hidden_layer_sizes[i];
+        int prev_layer_size = (i == 0) ? network->input_size : network->hidden_layer_sizes[i - 1];
+        for (int j = 0; j < layer_size; j++) {
+            for (int k = 0; k < prev_layer_size; k++) {
+                network->weights[i][j][k] = alpha * network->weights[i][j][k] + (1 - alpha) * other_network->weights[i][j][k];
+            }
+            network->biases[i][j] = alpha * network->biases[i][j] + (1 - alpha) * other_network->biases[i][j];
+        }
+    }
+    int last_layer_size = network->hidden_layer_sizes[network->n_hidden_layers - 1];
+    for (int j = 0; j < last_layer_size; j++) {
+        network->output_weights[j] = alpha * network->output_weights[j] + (1 - alpha) * other_network->output_weights[j];
+    }
 }
 
 // make a quick test of the neural network

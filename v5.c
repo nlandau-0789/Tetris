@@ -292,13 +292,13 @@ void init_piece_placements(){
     free(t);
 }
 
-struct placement_and_status {
+struct placement {
     int x, r;
     float eval;
     bool dead;
 };
 
-typedef struct placement_and_status placement_and_status;
+typedef struct placement placement;
 
 #include "nn.c"
 
@@ -343,71 +343,23 @@ __m256i place(int piece, int x, int r, __m256i board, int *n_lines_removed) {
     return new_board;
 }
 
-placement_and_status get_placement(int piece, __m256i board, nn *network) {
+placement get_placement(int piece, __m256i board, nn *network) {
     float best_eval = -INFINITY;
-    placement_and_status best_placement = {0, 0, 0, true};
+    placement best_placement = {0, 0, 0, true};
     for (int r = 0; r < n_rot[piece]; r++) {
         __m256i piece_board_init = placements[piece][r];
         for (int x = 0; x < 10-piece_width[piece][r]+1; x++) { // potential +/-1 mistake
-            int y = 16;
-            __m256i piece_board = piece_board_init;
-            if (!is_zero_m256i(_mm256_and_si256(piece_board, board))){
-                continue; // piece overlaps with board
-            }
-            while (y > piece_height[piece][r] && is_zero_m256i(_mm256_and_si256(_mm256_srli_epi16(piece_board, 1), board))){ // potential +/-1 mistake
-                y--;
-                piece_board = _mm256_srli_epi16(piece_board, 1);
-            }
-
-            // evaluate the placement
-            __m256i new_board = _mm256_or_si256(board, piece_board);
-            remove_full_lines(&new_board);
-            calc_consts(new_board);
-
-            // put consts in the nn input
-            short input_short[160];
-            for (int i = 0; i < 10; i++) {
-                _mm256_storeu_si256((__m256i*)(&input_short[i*16]), consts[i]);
-            }
-            float input[160];
-            for (int i = 0; i < 160; i++) {
-                input[i] = (float)input_short[i];
-            }
-
-            // run the nn
-            float *save_old_input = network->input;
-            network->input = input;
-            feed_forward(network, ReLU);
-            float eval = network->output;
-            network->input = save_old_input;
-
-            if (eval > best_eval) {
-                best_eval = eval;
-                best_placement.x = x;
-                best_placement.r = r;
-                best_placement.eval = eval;
-                best_placement.dead = false;
-            }
-            
-            piece_board_init = rotate_right_one(piece_board_init);
-        }
-    }
-    return best_placement;
-}
-
-placement_and_status logged_get_placement(int piece, __m256i board, nn *network) {
-    float best_eval = -INFINITY;
-    placement_and_status best_placement = {0, 0, 0, true};
-    for (int r = 0; r < n_rot[piece]; r++) {
-        __m256i piece_board_init = placements[piece][r];
-        for (int x = 0; x < 10-piece_width[piece][r]+1; x++) { // potential +/-1 mistake
+            #ifdef DEBUG_VERBOSE
             printf("Trying piece %d, rotation %d, x=%d\n", piece, r, x);
+            #endif
             int y = 16;
             __m256i piece_board = piece_board_init;
             if (!is_zero_m256i(_mm256_and_si256(piece_board, board))){
+                #ifdef DEBUG_VERBOSE
                 print_board(board);
                 print_board(piece_board);
                 printf("Piece overlaps with board at x=%d, r=%d\n", x, r);
+                #endif
                 continue; // piece overlaps with board
             }
             while (y > piece_height[piece][r] && is_zero_m256i(_mm256_and_si256(_mm256_srli_epi16(piece_board, 1), board))){ // potential +/-1 mistake
@@ -417,7 +369,7 @@ placement_and_status logged_get_placement(int piece, __m256i board, nn *network)
 
             // evaluate the placement
             __m256i new_board = _mm256_or_si256(board, piece_board);
-            remove_full_lines(&new_board);
+            int n_removed_lines = remove_full_lines(&new_board);
             calc_consts(new_board);
 
             // put consts in the nn input
@@ -429,6 +381,7 @@ placement_and_status logged_get_placement(int piece, __m256i board, nn *network)
             for (int i = 0; i < 160; i++) {
                 input[i] = (float)input_short[i];
             }
+            input[10] = (float)n_removed_lines; // add the number of removed lines to the input
 
             // run the nn
             float *save_old_input = network->input;
@@ -462,21 +415,98 @@ void get_nn_input(float input[], __m256i board) {
     }
 }
 
+int play_full_game(nn *network, int seed) {
+    __m256i board = ZERO;
+    srand(seed);
+    int piece = rand() % 7;
+    int n_lines_removed = 0;
 
+    for (int turn = 0; turn < 2000000000; turn++) {
+        placement placement = get_placement(piece, board, network);
+        if (placement.dead) {
+            // printf("Game over! Dead at turn %d\n", turn);
+            return turn;
+        }
+        board = place(piece, placement.x, placement.r, board, &n_lines_removed);
+        #ifdef DEBUG_VERBOSE
+        print_board(board);
+        #endif
+        piece = rand() % 7;
+    }
+    return 2000000000;
+}
+
+#define Q_LEARNING_TRAIN_C
+#include "q_learning_train.c"
+
+void train_nn(nn *generation[], int gen_size, int n_games, int n_gen, int n_hidden_layers, int hidden_layer_sizes[]) {
+    nn **new_generation = malloc(gen_size * sizeof(nn*));
+
+    reward_t rewards[] = {phase2_rew};
+    for (int i = 0; i < gen_size; i++) {
+        generation[i] = malloc(sizeof(nn));
+        init_nn(generation[i], 160, n_hidden_layers, hidden_layer_sizes);
+
+        rl_train(generation[i], 6000, 1, 0.0001f, 0.1f, 0.25f, rewards, 1);
+        printf("pretrained %d/%d\r", i+1, gen_size);
+        fflush(stdout);
+    }
+    for (int gen = 0; gen < n_gen; gen++) {
+        int *scores = malloc(gen_size * sizeof(int));
+        int *seeds = malloc(n_games * sizeof(int));
+        srand(time(NULL));
+        for (int i = 0; i < n_games; i++) {
+            seeds[i] = rand();
+        }
+        for (int i = 0; i < gen_size; i++) {
+            scores[i] = 0;
+            for (int j = 0; j < n_games; j++) {
+                int turns = play_full_game(generation[i], seeds[j]);
+                scores[i] += turns;
+                printf("            \r[%d] Game %02d/%d of instance %04d/%d, score: %d", gen, j+1, n_games, i+1, gen_size, turns);
+                // fflush(stdout);
+            }
+        }
+        
+        for (int i = 0; i < gen_size - 1; i++) {
+            for (int j = i + 1; j < gen_size; j++) {
+                if (scores[i] < scores[j]) {
+                    nn *temp = generation[i];
+                    generation[i] = generation[j];
+                    generation[j] = temp;
+                    
+                    int temp_score = scores[i];
+                    scores[i] = scores[j];
+                    scores[j] = temp_score;
+                }
+            }
+        }
+        for (int i = 0; i < gen_size; i++) {
+            new_generation[i] = malloc(sizeof(nn));
+            init_nn(new_generation[i], 160, n_hidden_layers, hidden_layer_sizes);
+            weight_avg_nn(new_generation[i], generation[i/20], 0.01f);
+        }
+        for (int i = 0; i < gen_size; i++) {
+            free_nn(generation[i]);
+            free(generation[i]);
+            generation[i] = new_generation[i];
+        }
+        printf("[%d] best : %d\n", gen, scores[0]);
+        free(scores);
+    }
+    free(new_generation);
+
+}
 
 int main(){
     init_piece_placements();
 
-    nn network;
-    int n_hidden_layers = 1;
-    int hidden_layer_sizes[] = {4};
-    init_nn(&network, 160, n_hidden_layers, hidden_layer_sizes);
-
-
-    // train(&network, ZERO, 0.0001f, rand() % 7, 0);
-    reward_t rewards[] = {phase1_rew, phase2_rew};
-    rl_train(&network, 10000, 300, 0.0001f, 0.1f, 0.25f, rewards, 2);
-
-    printf("Training complete.\n");
+    #define gen_size 100
+    nn *generation[gen_size];
+    int n_games = 20;
+    int n_gen = 10000;
+    int n_hidden_layers = 2;
+    int hidden_layer_sizes[] = {32, 32};
+    train_nn(generation, gen_size, n_games, n_gen, n_hidden_layers, hidden_layer_sizes);
 }
 

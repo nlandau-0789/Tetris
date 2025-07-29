@@ -14,11 +14,11 @@ float phase2_rew(__m256i old_board, __m256i new_board, int n_lines_removed) {
 
 float phase1_rew(__m256i old_board, __m256i new_board, int n_lines_removed) {
     // Reward for clearing lines
-    float line_reward = 0.0f;
-    if (n_lines_removed == 1) line_reward = 50.0f;
-    else if (n_lines_removed == 2) line_reward = 90.0f;
-    else if (n_lines_removed == 3) line_reward = 100.0f;
-    else if (n_lines_removed == 4) line_reward = 110.0f;
+    // float line_reward = 0.0f;
+    // if (n_lines_removed == 1) line_reward = 50.0f;
+    // else if (n_lines_removed == 2) line_reward = 90.0f;
+    // else if (n_lines_removed == 3) line_reward = 100.0f;
+    // else if (n_lines_removed == 4) line_reward = 110.0f;
 
     // Penalty for holes
     calc_consts(new_board);
@@ -78,7 +78,7 @@ void rl_train(nn *network, int episodes, int seasons, float learning_rate, float
                 last_piece = piece;
     
                 // Epsilon-greedy: random move or best move
-                placement_and_status best;
+                placement best;
                 if (((float)rand() / RAND_MAX) < epsilon) {
                     // Random action
                     int r = rand() % n_rot[piece];
@@ -143,7 +143,7 @@ void rl_train(nn *network, int episodes, int seasons, float learning_rate, float
                 turn++;
             }
             if (turn == 0) {
-                logged_get_placement(last_piece, board, network);
+                get_placement(last_piece, board, network);
             }
             if ((ep + 1) % 500 == 0) {
                 printf("\rEpisode %d finished, min=%f, max=%f, total_lr=%d        ", ep+1, min_reward, max_reward, total_lines_removed);
@@ -170,7 +170,7 @@ void rl_train(nn *network, int episodes, int seasons, float learning_rate, float
                 gamma_i = 0.99; // maximum gamma
             }
         }
-        printf("\n");
+        // printf("\n");
 
     }
 }
