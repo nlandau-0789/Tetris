@@ -10,5 +10,6 @@
         "type_traits": "c",
         "functional": "c",
         "atomic": "c"
-    }
+    },
+    "C_Cpp.errorSquiggles": "disabled"
 }
