@@ -1,8 +1,11 @@
 #ifdef Q_LEARNING_TRAIN_C
+#ifndef NN_INPUT_SIZE
+#define NN_INPUT_SIZE 100
+#endif
 float max_reward = -INFINITY;
 float min_reward = INFINITY;
 float phase2_rew(__m256i old_board, __m256i new_board, int n_lines_removed) {
-    float reward = (float)n_lines_removed / 4.0f;
+    float reward = (float)n_lines_removed * 10.0f; // Reward for clearing lines
     if (reward > max_reward) {
         max_reward = reward;
     }
@@ -55,6 +58,13 @@ float phase1_rew(__m256i old_board, __m256i new_board, int n_lines_removed) {
         min_reward = reward;
     }
     return reward;
+}
+
+float phase3_rew(__m256i old_board, __m256i new_board, int n_lines_removed) {
+    calc_consts(new_board);
+    short max_height = ((short*)&consts[1])[0];
+    float reward = 16-max_height;
+    return reward / 16.0f;
 }
 
 float rew(__m256i old_board, __m256i new_board, int n_lines_removed) {
@@ -110,11 +120,9 @@ void rl_train(nn *network, int episodes, int seasons, float learning_rate, float
                 // Place the piece
                 float reward = 0;
                 if (best.dead) {
-                    reward = -100;
-                    total_reward += reward;
-                    float target = -100;
+                    float target = 0.0f;
     
-                    float input[160];
+                    float input[NN_INPUT_SIZE];
                     get_nn_input(input, board);
                     for (int epoch = 0; epoch < 3; epoch++) {
                         backpropagate(network, input, target, ReLU, ReLU_derivative, learning_rate / 3.0f);
@@ -128,7 +136,7 @@ void rl_train(nn *network, int episodes, int seasons, float learning_rate, float
                 total_lines_removed += n_lines_removed;
     
                 // Prepare NN input for current state
-                float input[160], next_input[160];
+                float input[NN_INPUT_SIZE], next_input[NN_INPUT_SIZE];
                 get_nn_input(input, board);
                 get_nn_input(next_input, new_board);
     
@@ -137,6 +145,7 @@ void rl_train(nn *network, int episodes, int seasons, float learning_rate, float
                 feed_forward(network, ReLU);
                 if (isnan(network->output) || fabs(network->output) > 1e6) {
                     printf("Network output unstable: %f\n", network->output);
+                    print_nn(network);
                     exit(1);
                 }
                 float next_value = (network->output);
@@ -157,7 +166,7 @@ void rl_train(nn *network, int episodes, int seasons, float learning_rate, float
                 get_placement(last_piece, board, network);
             }
             if ((ep + 1) % 500 == 0) {
-                printf("\rEpisode %d finished, avg_lr=%d, avg_output=%lf        ", ep+1, total_lines_removed/500, avg_output / 500.0);
+                printf("\rEpisode %d finished, avg_lr=%lf, avg_output=%lf        ", ep+1, (double)total_lines_removed/500, avg_output / 500.0);
                 avg_output = 0.0;
                 fflush(stdout);
                 total_lines_removed = 0;
@@ -189,7 +198,6 @@ void rl_train(nn *network, int episodes, int seasons, float learning_rate, float
 
 void batched_q_train(nn* network, int n_episodes, int batch_size, float learning_rate, float gamma, float epsilon, float epsilon_decay, reward_t rew) {
     #define MAX_TURNS 2500
-    #define NN_INPUT_SIZE 160
     float **states_memory = malloc(MAX_TURNS * sizeof(float*));
     float *targets_memory = malloc(MAX_TURNS * sizeof(float));
     float **states_batch = malloc(batch_size * sizeof(float*));
@@ -235,7 +243,7 @@ void batched_q_train(nn* network, int n_episodes, int batch_size, float learning
                 reward = -1.0f;
                 float target = -1.0f;
 
-                float input[160];
+                float input[NN_INPUT_SIZE];
                 get_nn_input(input, board);
                 backpropagate(network, input, target, ReLU, ReLU_derivative, learning_rate);
                 break;
@@ -246,7 +254,7 @@ void batched_q_train(nn* network, int n_episodes, int batch_size, float learning
             total_lines_removed += n_lines_removed;
 
             // Prepare NN input for current state
-            float next_input[160];
+            float next_input[NN_INPUT_SIZE];
             get_nn_input(states_memory[memory_size], board);
             get_nn_input(next_input, new_board);
 

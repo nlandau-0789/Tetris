@@ -406,12 +406,22 @@ placement get_placement(int piece, __m256i board, nn *network) {
 
 void get_nn_input(float input[], __m256i board) {
     calc_consts(board);
-    short input_short[160];
+    short temp[16];
     for (int i = 0; i < 10; i++) {
-        _mm256_storeu_si256((__m256i*)(&input_short[i*16]), consts[i]);
+        _mm256_storeu_si256((__m256i*)(&temp), consts[i]);
+        for (int j = 0; j < 10; j++) {
+            input[i * 10 + j] = temp[j];
+            input[i * 10 + j] /= 16;
+        }
     }
-    for (int i = 0; i < 160; i++) {
-        input[i] = (float)input_short[i] / 16.0f;
+    if (rand() % 10000 == -1) {
+        for (int i = 0; i < 10; i++) {
+            for (int j = 0; j < 10; j++) {
+                printf("%d ", (int)(input[i*10+j]*16));
+            }
+            printf("\n");
+        }
+        print_board(board);
     }
 }
 
@@ -437,6 +447,7 @@ int play_full_game(nn *network, int seed) {
 }
 
 #define Q_LEARNING_TRAIN_C
+#define NN_INPUT_SIZE 100
 #include "q_learning_train.c"
 
 int main(){
@@ -445,10 +456,10 @@ int main(){
     int n_hidden_layers = 3;
     int hidden_layer_sizes[] = {32, 32, 32};
     nn *network = malloc(sizeof(nn));
-    init_nn(network, 160, n_hidden_layers, hidden_layer_sizes, 0.0001f);
+    init_nn(network, NN_INPUT_SIZE, n_hidden_layers, hidden_layer_sizes, 0.0001f);
 
-    reward_t rewards[] = {phase1_rew, phase2_rew};
-    rl_train(network, 1250000, 1000, 0.0001f, 0.1f, 0.25f, rewards, 1);
+    reward_t rewards[] = {phase1_rew};
+    rl_train(network, 1250000, 1000, 0.0004f, 0.4f, 1.0f, rewards, 1);
     // batched_q_train(network, 10000, 16, 0.0001f, 0.95f, 1.0f, 0.00025f, rew);
 }
 

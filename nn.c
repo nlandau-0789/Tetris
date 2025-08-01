@@ -404,7 +404,7 @@ void print_nn(nn *network) {
         }
         printf("Output weights:\n  ");
         for (int j = 0; j < network->hidden_layer_sizes[i]; j++) {
-            printf("%f ", j, network->output_weights[j]);
+            printf("%f ", network->output_weights[j]);
         }
     }
 }
