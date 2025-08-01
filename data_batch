@@ -1,0 +1,270 @@
+Flat profile:
+
+Each sample counts as 0.01 seconds.
+  %   cumulative   self              self     total           
+ time   seconds   seconds    calls   s/call   s/call  name    
+ 92.16     11.24    11.24   429474     0.00     0.00  feed_forward
+  1.80     11.46     0.22  1817896     0.00     0.00  bitonic_sort_epu16
+  1.72     11.67     0.21 42227904     0.00     0.00  ReLU
+  1.31     11.83     0.16   454474     0.00     0.00  calc_consts
+  0.98     11.95     0.12    18815     0.00     0.00  get_placement
+  0.57     12.02     0.07   908948     0.00     0.00  cut_epi16
+  0.41     12.07     0.05  6229744     0.00     0.00  is_zero_m256i
+  0.25     12.10     0.03    50000     0.00     0.00  get_nn_input
+  0.16     12.12     0.02   948221     0.00     0.00  rotate_right_one
+  0.16     12.14     0.02   429474     0.00     0.00  remove_full_lines
+  0.16     12.16     0.02       30     0.00     0.00  batched_backpropagate
+  0.08     12.17     0.01  1313422     0.00     0.00  rotate_left_one
+  0.08     12.18     0.01   858948     0.00     0.00  rotate_right
+  0.08     12.19     0.01        1     0.01    12.19  batched_q_train
+  0.08     12.20     0.01                             _init
+  0.00     12.20     0.00    25000     0.00     0.00  place
+  0.00     12.20     0.00    25000     0.00     0.00  rew
+  0.00     12.20     0.00    15360     0.00     0.00  ReLU_derivative
+  0.00     12.20     0.00       19     0.00     0.00  board_from_array
+  0.00     12.20     0.00        1     0.00     0.00  init_nn
+  0.00     12.20     0.00        1     0.00     0.00  init_piece_placements
+
+ %         the percentage of the total running time of the
+time       program used by this function.
+
+cumulative a running sum of the number of seconds accounted
+ seconds   for by this function and those listed above it.
+
+ self      the number of seconds accounted for by this
+seconds    function alone.  This is the major sort for this
+           listing.
+
+calls      the number of times this function was invoked, if
+           this function is profiled, else blank.
+
+ self      the average number of milliseconds spent in this
+ms/call    function per call, if this function is profiled,
+	   else blank.
+
+ total     the average number of milliseconds spent in this
+ms/call    function and its descendents per call, if this
+	   function is profiled, else blank.
+
+name       the name of the function.  This is the minor sort
+           for this listing. The index shows the location of
+	   the function in the gprof listing. If the index is
+	   in parenthesis it shows where it would appear in
+	   the gprof listing if it were to be printed.
+
+Copyright (C) 2012-2025 Free Software Foundation, Inc.
+
+Copying and distribution of this file, with or without modification,
+are permitted in any medium without royalty provided the copyright
+notice and this notice are preserved.
+
+		     Call graph (explanation follows)
+
+
+granularity: each sample hit covers 2 byte(s) for 0.08% of 12.20 seconds
+
+index % time    self  children    called     name
+                0.01   12.18       1/1           main [2]
+[1]     99.9    0.01   12.18       1         batched_q_train [1]
+                0.12   11.28   18815/18815       get_placement [4]
+                0.65    0.01   25000/429474      feed_forward [3]
+                0.03    0.05   50000/50000       get_nn_input [8]
+                0.02    0.00      30/30          batched_backpropagate [12]
+                0.00    0.01   25000/25000       place [17]
+                0.00    0.00   23828/948221      rotate_right_one [13]
+                0.00    0.00    6185/6229744     is_zero_m256i [10]
+                0.00    0.00   25000/25000       rew [18]
+-----------------------------------------------
+                                                 <spontaneous>
+[2]     99.9    0.00   12.19                 main [2]
+                0.01   12.18       1/1           batched_q_train [1]
+                0.00    0.00       1/1           init_piece_placements [22]
+                0.00    0.00       1/1           init_nn [21]
+-----------------------------------------------
+                0.65    0.01   25000/429474      batched_q_train [1]
+               10.59    0.19  404474/429474      get_placement [4]
+[3]     93.8   11.24    0.21  429474         feed_forward [3]
+                0.21    0.00 41229504/42227904     ReLU [7]
+-----------------------------------------------
+                0.12   11.28   18815/18815       batched_q_train [1]
+[4]     93.5    0.12   11.28   18815         get_placement [4]
+               10.59    0.19  404474/429474      feed_forward [3]
+                0.14    0.27  404474/454474      calc_consts [5]
+                0.05    0.00 5879478/6229744     is_zero_m256i [10]
+                0.02    0.02  404474/429474      remove_full_lines [11]
+                0.01    0.00  404474/948221      rotate_right_one [13]
+-----------------------------------------------
+                0.02    0.03   50000/454474      get_nn_input [8]
+                0.14    0.27  404474/454474      get_placement [4]
+[5]      3.8    0.16    0.30  454474         calc_consts [5]
+                0.22    0.00 1817896/1817896     bitonic_sort_epu16 [6]
+                0.07    0.00  908948/908948      cut_epi16 [9]
+                0.01    0.00  454474/948221      rotate_right_one [13]
+                0.00    0.00  454474/1313422     rotate_left_one [14]
+-----------------------------------------------
+                0.22    0.00 1817896/1817896     calc_consts [5]
+[6]      1.8    0.22    0.00 1817896         bitonic_sort_epu16 [6]
+-----------------------------------------------
+                0.00    0.00  998400/42227904     batched_backpropagate [12]
+                0.21    0.00 41229504/42227904     feed_forward [3]
+[7]      1.7    0.21    0.00 42227904         ReLU [7]
+-----------------------------------------------
+                0.03    0.05   50000/50000       batched_q_train [1]
+[8]      0.7    0.03    0.05   50000         get_nn_input [8]
+                0.02    0.03   50000/454474      calc_consts [5]
+-----------------------------------------------
+                0.07    0.00  908948/908948      calc_consts [5]
+[9]      0.6    0.07    0.00  908948         cut_epi16 [9]
+-----------------------------------------------
+                0.00    0.00    6185/6229744     batched_q_train [1]
+                0.00    0.00  344081/6229744     place [17]
+                0.05    0.00 5879478/6229744     get_placement [4]
+[10]     0.4    0.05    0.00 6229744         is_zero_m256i [10]
+-----------------------------------------------
+                0.00    0.00   25000/429474      place [17]
+                0.02    0.02  404474/429474      get_placement [4]
+[11]     0.3    0.02    0.02  429474         remove_full_lines [11]
+                0.01    0.00  858948/858948      rotate_right [15]
+                0.01    0.00  858948/1313422     rotate_left_one [14]
+-----------------------------------------------
+                0.02    0.00      30/30          batched_q_train [1]
+[12]     0.2    0.02    0.00      30         batched_backpropagate [12]
+                0.00    0.00  998400/42227904     ReLU [7]
+                0.00    0.00   15360/15360       ReLU_derivative [19]
+-----------------------------------------------
+                0.00    0.00   23828/948221      batched_q_train [1]
+                0.00    0.00   65445/948221      place [17]
+                0.01    0.00  404474/948221      get_placement [4]
+                0.01    0.00  454474/948221      calc_consts [5]
+[13]     0.2    0.02    0.00  948221         rotate_right_one [13]
+-----------------------------------------------
+                0.00    0.00  454474/1313422     calc_consts [5]
+                0.01    0.00  858948/1313422     remove_full_lines [11]
+[14]     0.1    0.01    0.00 1313422         rotate_left_one [14]
+-----------------------------------------------
+                0.01    0.00  858948/858948      remove_full_lines [11]
+[15]     0.1    0.01    0.00  858948         rotate_right [15]
+-----------------------------------------------
+                                                 <spontaneous>
+[16]     0.1    0.01    0.00                 _init [16]
+-----------------------------------------------
+                0.00    0.01   25000/25000       batched_q_train [1]
+[17]     0.1    0.00    0.01   25000         place [17]
+                0.00    0.00  344081/6229744     is_zero_m256i [10]
+                0.00    0.00   25000/429474      remove_full_lines [11]
+                0.00    0.00   65445/948221      rotate_right_one [13]
+-----------------------------------------------
+                0.00    0.00   25000/25000       batched_q_train [1]
+[18]     0.0    0.00    0.00   25000         rew [18]
+-----------------------------------------------
+                0.00    0.00   15360/15360       batched_backpropagate [12]
+[19]     0.0    0.00    0.00   15360         ReLU_derivative [19]
+-----------------------------------------------
+                0.00    0.00      19/19          init_piece_placements [22]
+[20]     0.0    0.00    0.00      19         board_from_array [20]
+-----------------------------------------------
+                0.00    0.00       1/1           main [2]
+[21]     0.0    0.00    0.00       1         init_nn [21]
+-----------------------------------------------
+                0.00    0.00       1/1           main [2]
+[22]     0.0    0.00    0.00       1         init_piece_placements [22]
+                0.00    0.00      19/19          board_from_array [20]
+-----------------------------------------------
+
+ This table describes the call tree of the program, and was sorted by
+ the total amount of time spent in each function and its children.
+
+ Each entry in this table consists of several lines.  The line with the
+ index number at the left hand margin lists the current function.
+ The lines above it list the functions that called this function,
+ and the lines below it list the functions this one called.
+ This line lists:
+     index	A unique number given to each element of the table.
+		Index numbers are sorted numerically.
+		The index number is printed next to every function name so
+		it is easier to look up where the function is in the table.
+
+     % time	This is the percentage of the `total' time that was spent
+		in this function and its children.  Note that due to
+		different viewpoints, functions excluded by options, etc,
+		these numbers will NOT add up to 100%.
+
+     self	This is the total amount of time spent in this function.
+
+     children	This is the total amount of time propagated into this
+		function by its children.
+
+     called	This is the number of times the function was called.
+		If the function called itself recursively, the number
+		only includes non-recursive calls, and is followed by
+		a `+' and the number of recursive calls.
+
+     name	The name of the current function.  The index number is
+		printed after it.  If the function is a member of a
+		cycle, the cycle number is printed between the
+		function's name and the index number.
+
+
+ For the function's parents, the fields have the following meanings:
+
+     self	This is the amount of time that was propagated directly
+		from the function into this parent.
+
+     children	This is the amount of time that was propagated from
+		the function's children into this parent.
+
+     called	This is the number of times this parent called the
+		function `/' the total number of times the function
+		was called.  Recursive calls to the function are not
+		included in the number after the `/'.
+
+     name	This is the name of the parent.  The parent's index
+		number is printed after it.  If the parent is a
+		member of a cycle, the cycle number is printed between
+		the name and the index number.
+
+ If the parents of the function cannot be determined, the word
+ `<spontaneous>' is printed in the `name' field, and all the other
+ fields are blank.
+
+ For the function's children, the fields have the following meanings:
+
+     self	This is the amount of time that was propagated directly
+		from the child into the function.
+
+     children	This is the amount of time that was propagated from the
+		child's children to the function.
+
+     called	This is the number of times the function called
+		this child `/' the total number of times the child
+		was called.  Recursive calls by the child are not
+		listed in the number after the `/'.
+
+     name	This is the name of the child.  The child's index
+		number is printed after it.  If the child is a
+		member of a cycle, the cycle number is printed
+		between the name and the index number.
+
+ If there are any cycles (circles) in the call graph, there is an
+ entry for the cycle-as-a-whole.  This entry shows who called the
+ cycle (as parents) and the members of the cycle (as children.)
+ The `+' recursive calls entry shows the number of function calls that
+ were internal to the cycle, and the calls entry for each member shows,
+ for that member, how many times it was called from other members of
+ the cycle.
+
+Copyright (C) 2012-2025 Free Software Foundation, Inc.
+
+Copying and distribution of this file, with or without modification,
+are permitted in any medium without royalty provided the copyright
+notice and this notice are preserved.
+
+Index by function name
+
+   [7] ReLU                    [5] calc_consts            [10] is_zero_m256i
+  [19] ReLU_derivative         [9] cut_epi16              [17] place
+  [16] _init                   [3] feed_forward           [11] remove_full_lines
+  [12] batched_backpropagate   [8] get_nn_input           [18] rew
+   [1] batched_q_train         [4] get_placement          [14] rotate_left_one
+   [6] bitonic_sort_epu16     [21] init_nn                [15] rotate_right
+  [20] board_from_array       [22] init_piece_placements  [13] rotate_right_one

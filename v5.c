@@ -442,12 +442,13 @@ int play_full_game(nn *network, int seed) {
 int main(){
     init_piece_placements();
 
-    #define gen_size 100
-    nn *generation[gen_size];
-    int n_games = 20;
-    int n_gen = 10000;
-    int n_hidden_layers = 2;
-    int hidden_layer_sizes[] = {32, 32};
-    // train_nn(generation, gen_size, n_games, n_gen, n_hidden_layers, hidden_layer_sizes);
+    int n_hidden_layers = 3;
+    int hidden_layer_sizes[] = {32, 32, 32};
+    nn *network = malloc(sizeof(nn));
+    init_nn(network, 160, n_hidden_layers, hidden_layer_sizes, 0.0001f);
+
+    reward_t rewards[] = {phase1_rew, phase2_rew};
+    rl_train(network, 1250000, 1000, 0.0001f, 0.1f, 0.25f, rewards, 1);
+    // batched_q_train(network, 10000, 16, 0.0001f, 0.95f, 1.0f, 0.00025f, rew);
 }
 
