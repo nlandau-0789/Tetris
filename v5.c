@@ -12,6 +12,7 @@ __builtin_popcount --> il faut -march=native
 
 #include "utils.h"
 #define n_consts 12
+#define NN_INPUT_SIZE 100
 
 // Utilitaires 
 void print_board(__m256i board){
@@ -343,6 +344,18 @@ __m256i place(int piece, int x, int r, __m256i board, int *n_lines_removed) {
     return new_board;
 }
 
+void get_nn_input(float input[], __m256i board) {
+    calc_consts(board);
+    short temp[16];
+    for (int i = 0; i < 10; i++) {
+        _mm256_storeu_si256((__m256i*)(&temp), consts[i]);
+        for (int j = 0; j < 10; j++) {
+            input[i * 10 + j] = temp[j];
+            input[i * 10 + j] /= 16;
+        }
+    }
+}
+
 placement get_placement(int piece, __m256i board, nn *network) {
     float best_eval = -INFINITY;
     placement best_placement = {0, 0, 0, true};
@@ -369,19 +382,11 @@ placement get_placement(int piece, __m256i board, nn *network) {
 
             // evaluate the placement
             __m256i new_board = _mm256_or_si256(board, piece_board);
-            int n_removed_lines = remove_full_lines(&new_board);
+            remove_full_lines(&new_board);
             calc_consts(new_board);
 
-            // put consts in the nn input
-            short input_short[160];
-            for (int i = 0; i < 10; i++) {
-                _mm256_storeu_si256((__m256i*)(&input_short[i*16]), consts[i]);
-            }
-            float input[160];
-            for (int i = 0; i < 160; i++) {
-                input[i] = (float)input_short[i];
-            }
-            input[10] = (float)n_removed_lines; // add the number of removed lines to the input
+            float input[NN_INPUT_SIZE];
+            get_nn_input(input, new_board);
 
             // run the nn
             float *save_old_input = network->input;
@@ -404,26 +409,6 @@ placement get_placement(int piece, __m256i board, nn *network) {
     return best_placement;
 }
 
-void get_nn_input(float input[], __m256i board) {
-    calc_consts(board);
-    short temp[16];
-    for (int i = 0; i < 10; i++) {
-        _mm256_storeu_si256((__m256i*)(&temp), consts[i]);
-        for (int j = 0; j < 10; j++) {
-            input[i * 10 + j] = temp[j];
-            input[i * 10 + j] /= 16;
-        }
-    }
-    if (rand() % 10000 == -1) {
-        for (int i = 0; i < 10; i++) {
-            for (int j = 0; j < 10; j++) {
-                printf("%d ", (int)(input[i*10+j]*16));
-            }
-            printf("\n");
-        }
-        print_board(board);
-    }
-}
 
 int play_full_game(nn *network, int seed) {
     __m256i board = ZERO;
@@ -447,7 +432,6 @@ int play_full_game(nn *network, int seed) {
 }
 
 #define Q_LEARNING_TRAIN_C
-#define NN_INPUT_SIZE 100
 #include "q_learning_train.c"
 
 int main(){
@@ -459,7 +443,7 @@ int main(){
     init_nn(network, NN_INPUT_SIZE, n_hidden_layers, hidden_layer_sizes, 0.0001f);
 
     reward_t rewards[] = {phase1_rew};
-    rl_train(network, 1250000, 1000, 0.0004f, 0.4f, 1.0f, rewards, 1);
+    rl_train(network, 1250000, 1000, 0.0001f, 0.1f, 0.25f, rewards, 1);
     // batched_q_train(network, 10000, 16, 0.0001f, 0.95f, 1.0f, 0.00025f, rew);
 }
 

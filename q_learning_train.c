@@ -120,7 +120,7 @@ void rl_train(nn *network, int episodes, int seasons, float learning_rate, float
                 // Place the piece
                 float reward = 0;
                 if (best.dead) {
-                    float target = 0.0f;
+                    float target = -100.0f;
     
                     float input[NN_INPUT_SIZE];
                     get_nn_input(input, board);
