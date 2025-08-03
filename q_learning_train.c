@@ -120,7 +120,7 @@ void rl_train(nn *network, int episodes, int seasons, float learning_rate, float
                 // Place the piece
                 float reward = 0;
                 if (best.dead) {
-                    float target = -100.0f;
+                    float target = -1.0f;
     
                     float input[NN_INPUT_SIZE];
                     get_nn_input(input, board);
@@ -143,7 +143,7 @@ void rl_train(nn *network, int episodes, int seasons, float learning_rate, float
                 // Q-learning target: reward + gamma * max_a' Q(next_state, a')
                 network->input = next_input;
                 feed_forward(network, ReLU);
-                if (isnan(network->output) || fabs(network->output) > 1e6) {
+                if (isnan(network->output) || fabs(network->output) > 1e15) {
                     printf("Network output unstable: %f\n", network->output);
                     print_nn(network);
                     exit(1);
@@ -152,8 +152,8 @@ void rl_train(nn *network, int episodes, int seasons, float learning_rate, float
                 avg_output += next_value;
     
                 float target = (reward + gamma * next_value);
-                if (target > 1000.0f) target = 1000.0f;
-                if (target < -1000.0f) target = -1000.0f;
+                // if (target > 1000.0f) target = 1000.0f;
+                // if (target < -1000.0f) target = -1000.0f;
     
                 // Train on (state, target)
                 backpropagate(network, input, target, ReLU, ReLU_derivative, learning_rate);
@@ -172,26 +172,26 @@ void rl_train(nn *network, int episodes, int seasons, float learning_rate, float
                 total_lines_removed = 0;
             } 
             epsilon *= 0.9999;
-            gamma *= 1.0004;
-            if (epsilon < 0.1) {
-                epsilon = 0.1; // minimum epsilon
-            }
-            if (gamma > 0.99) {
-                gamma = 0.99; // maximum gamma
-            }
+            // gamma *= 1.0004;
+            // if (epsilon < 0.15) {
+            //     epsilon = 0.15f; // minimum epsilon
+            // }
+            // if (gamma > 0.99) {
+            //     gamma = 0.99; // maximum gamma
+            // }
         }
-        if (total_lines_removed > threshold_lines * episodes) {
-            learning_rate *= 0.9;
-            threshold_lines *= 3;
-            epsilon_i *= 0.95;
-            gamma_i *= 1.05;
-            if (epsilon_i < 0.1) {
-                epsilon_i = 0.1; // minimum epsilon
-            }
-            if (gamma_i > 0.99) {
-                gamma_i = 0.99; // maximum gamma
-            }
-        }
+        // if (total_lines_removed > threshold_lines * episodes) {
+        //     learning_rate *= 0.99;
+        //     threshold_lines *= 10;
+        //     epsilon_i *= 0.99;
+        //     gamma_i *= 1.01;
+        //     if (epsilon_i < 0.1) {
+        //         epsilon_i = 0.1; // minimum epsilon
+        //     }
+        //     if (gamma_i > 0.99) {
+        //         gamma_i = 0.99; // maximum gamma
+        //     }
+        // }
         printf("\n");
     }
 }

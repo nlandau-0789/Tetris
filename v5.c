@@ -437,6 +437,7 @@ int play_full_game(nn *network, int seed) {
 
     for (int turn = 0; turn < 2000000000; turn++) {
         placement placement = get_placement(piece, board, network);
+        printf("%f\n", placement.eval);
         if (placement.dead) {
             // printf("Game over! Dead at turn %d\n", turn);
             return turn;
@@ -471,36 +472,52 @@ int print_full_game(FILE * f, nn *network, int seed) {
 
 #define EVO_TRAIN_C
 #include "evo_train.c"
+#define Q_LEARNING_TRAIN_C
+#include "q_learning_train.c"
+
+nn *rew_nn;
+
+float advanced_rew(__m256i old_board, __m256i new_board, int n_lines_removed) {
+    get_nn_input(rew_nn->input, new_board);
+    feed_forward(rew_nn, ReLU);
+    float reward = 1.0f + rew_nn->output * 40.0f;
+    return reward;
+}
 
 int main(){
     init_piece_placements();
 
-    int n_hidden_layers = 1;
-    int hidden_layer_sizes[] = {1};
+    int n_hidden_layers = 2;
+    int hidden_layer_sizes[] = {16, 16};
     int gen_size = 10000, n_games = 10, n_gen = 100000;
     
     #ifdef DEBUG_VERBOSE
     log_file = fopen("logs", "w");
     #endif
     
-    {
-    // nn * network = malloc(sizeof(nn));
-    // load_nn(network, "games/gen64");
+    rew_nn = malloc(sizeof(nn));
+    load_nn(rew_nn, "gen103");
+    
+    nn * network = malloc(sizeof(nn));
+    init_nn(network, NN_INPUT_SIZE, n_hidden_layers, hidden_layer_sizes, 0.001f, time(NULL));
+    // printf("%d", play_full_game(network, 4567));
 
     // FILE * f = fopen("game", "w");
     // printf("%d\n", print_full_game(f, network, 456784));
     // fclose(f);
-    // free(network);
-
-    // fclose(log_file);
-    }
-
-    nn *generation[10000];
     
-    train_nn(generation, gen_size, n_games, n_gen, n_hidden_layers, hidden_layer_sizes);
-
-    // reward_t rewards[] = {phase1_rew};
-    // rl_train(network, 1250000, 1000, 0.0001f, 0.1f, 0.25f, rewards, 1);
+    // nn *generation[10000];
+    
+    // train_nn(generation, gen_size, n_games, n_gen, n_hidden_layers, hidden_layer_sizes);
+    
+    reward_t rewards[] = {advanced_rew};
+    rl_train(network, 250000, 1000, 0.0001f, 0.99f, 0.75f, rewards, 1);
     // batched_q_train(network, 10000, 16, 0.0001f, 0.95f, 1.0f, 0.00025f, rew);
+    free(network);
+    free(rew_nn);
+
+    #ifdef DEBUG_VERBOSE
+    fclose(log_file);
+    #endif
 }
 
