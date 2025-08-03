@@ -369,6 +369,9 @@ void get_nn_input(float input[], __m256i board) {
     }
 }
 
+#ifdef DEBUG_VERBOSE
+FILE * log_file;
+#endif
 placement get_placement(int piece, __m256i board, nn *network) {
     float best_eval = -INFINITY;
     placement best_placement = {0, 0, 0, true};
@@ -376,21 +379,25 @@ placement get_placement(int piece, __m256i board, nn *network) {
         __m256i piece_board_init = placements[piece][r];
         for (int x = 0; x < 10-piece_width[piece][r]+1; x++) { // potential +/-1 mistake
             #ifdef DEBUG_VERBOSE
-            printf("Trying piece %d, rotation %d, x=%d\n", piece, r, x);
+            // printf("Trying piece %d, rotation %d, x=%d\n", piece, r, x);
             #endif
             int y = 16;
             __m256i piece_board = piece_board_init;
             if (!is_zero_m256i(_mm256_and_si256(piece_board, board))){
                 #ifdef DEBUG_VERBOSE
-                print_board(board);
-                print_board(piece_board);
-                printf("Piece overlaps with board at x=%d, r=%d\n", x, r);
+                fprint_board(log_file, board);
+                fprint_board(log_file, piece_board);
+                fprintf(log_file, "Piece overlaps with board at x=%d, r=%d\n", x, r);
                 #endif
+                piece_board_init = rotate_right_one(piece_board_init);
                 continue; // piece overlaps with board
             }
             while (y > piece_height[piece][r] && is_zero_m256i(_mm256_and_si256(_mm256_srli_epi16(piece_board, 1), board))){ // potential +/-1 mistake
                 y--;
                 piece_board = _mm256_srli_epi16(piece_board, 1);
+                #ifdef DEBUG_VERBOSE
+                fprint_board(log_file, piece_board);
+                #endif
             }
 
             // evaluate the placement
@@ -443,7 +450,7 @@ int play_full_game(nn *network, int seed) {
     return 2000000000;
 }
 
-void print_full_game(FILE * f, nn *network, int seed) {
+int print_full_game(FILE * f, nn *network, int seed) {
     __m256i board = ZERO;
     srand(seed);
     int piece = rand() % 7;
@@ -453,12 +460,13 @@ void print_full_game(FILE * f, nn *network, int seed) {
         placement placement = get_placement(piece, board, network);
         if (placement.dead) {
             // printf("Game over! Dead at turn %d\n", turn);
-            return;
+            return turn;
         }
         board = place(piece, placement.x, placement.r, board, &n_lines_removed);
         fprint_board(f, board);
         piece = rand() % 7;
     }
+    return 2000000000;
 }
 
 #define EVO_TRAIN_C
@@ -467,13 +475,25 @@ void print_full_game(FILE * f, nn *network, int seed) {
 int main(){
     init_piece_placements();
 
-    int n_hidden_layers = 0;
+    int n_hidden_layers = 1;
     int hidden_layer_sizes[] = {1};
     int gen_size = 10000, n_games = 10, n_gen = 100000;
+
+    log_file = fopen("logs", "w");
     
-    nn *generation[10000];
+    nn * network = malloc(sizeof(nn));
+    load_nn(network, "games/gen64");
+
+    FILE * f = fopen("game", "w");
+    printf("%d\n", print_full_game(f, network, 456784));
+    fclose(f);
+    free(network);
+
+    fclose(log_file);
+
+    // nn *generation[10000];
     
-    train_nn(generation, gen_size, n_games, n_gen, n_hidden_layers, hidden_layer_sizes);
+    // train_nn(generation, gen_size, n_games, n_gen, n_hidden_layers, hidden_layer_sizes);
 
     // reward_t rewards[] = {phase1_rew};
     // rl_train(network, 1250000, 1000, 0.0001f, 0.1f, 0.25f, rewards, 1);

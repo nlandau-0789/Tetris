@@ -50,8 +50,9 @@ void train_nn(nn *generation[], int gen_size, int n_games, int n_gen, int n_hidd
         }
         printf("\n");
 
-        // char buffer[100];
-        // sprintf(buffer, "./games/gen%d", gen);
+        char buffer[100];
+        sprintf(buffer, "./games/gen%d", gen);
+        save_nn(generation[0], buffer);
         // FILE * f = fopen(buffer, "w");
         // print_full_game(f, generation[0], time(NULL));
         // fclose(f);

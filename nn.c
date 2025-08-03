@@ -99,7 +99,7 @@ void feed_forward(nn* network, float (*activation)(float)) {
     }
 
     network->output = 0.0f;
-    int last_layer_size = (network->n_hidden_layers > 1)?network->hidden_layer_sizes[network->n_hidden_layers - 1]:network->input_size;
+    int last_layer_size = (network->n_hidden_layers > 0)?network->hidden_layer_sizes[network->n_hidden_layers - 1]:network->input_size;
     for (int j = 0; j < last_layer_size; j++) {
         network->output += network->output_weights[j] * input[j];
         // printf("input[%d]: %f %f\n", j, input[j], network->output_weights[j]);
@@ -144,7 +144,7 @@ void backpropagate(nn* network, float *input, float target, float (*activation)(
 
     // Output layer
     float y = 0.0f;
-    int last_layer_size = (network->n_hidden_layers > 1)?network->hidden_layer_sizes[network->n_hidden_layers - 1]:network->input_size;;
+    int last_layer_size = (network->n_hidden_layers > 0)?network->hidden_layer_sizes[network->n_hidden_layers - 1]:network->input_size;;
     for (int i = 0; i < last_layer_size; i++) {
         y += network->output_weights[i] * activation(x[n_layers - 1][i]);
     }
@@ -254,7 +254,7 @@ void batched_backpropagate(nn* network, float **input, float *target, int batch_
         }
         
         float y = 0.0f;
-        int last_layer_size = (network->n_hidden_layers > 1)?network->hidden_layer_sizes[network->n_hidden_layers - 1]:network->input_size;;
+        int last_layer_size = (network->n_hidden_layers > 0)?network->hidden_layer_sizes[network->n_hidden_layers - 1]:network->input_size;;
         for (int i = 0; i < last_layer_size; i++) {
             y += network->output_weights[i] * activation(x[n_layers - 1][i]);
         }
@@ -374,7 +374,7 @@ float ReLU_derivative(float x) {
 }
 
 void weight_avg_nn(nn *network, nn *other_network, float alpha) {
-    int last_layer_size = (network->n_hidden_layers > 1)?network->hidden_layer_sizes[network->n_hidden_layers - 1]:network->input_size;
+    int last_layer_size = (network->n_hidden_layers > 0)?network->hidden_layer_sizes[network->n_hidden_layers - 1]:network->input_size;
     // Average the weights and biases of two networks
     for (int i = 0; i < network->n_hidden_layers; i++) {
         int layer_size = network->hidden_layer_sizes[i];
@@ -395,7 +395,7 @@ void weight_avg_nn(nn *network, nn *other_network, float alpha) {
 
 // pretty print the neural network
 void print_nn(nn *network) {
-    int last_layer_size = (network->n_hidden_layers > 1)?network->hidden_layer_sizes[network->n_hidden_layers - 1]:network->input_size;
+    int last_layer_size = (network->n_hidden_layers > 0)?network->hidden_layer_sizes[network->n_hidden_layers - 1]:network->input_size;
     printf("Neural Network:\n");
     printf("Input size: %d\n", network->input_size);
     printf("Number of hidden layers: %d\n", network->n_hidden_layers);
@@ -417,6 +417,86 @@ void print_nn(nn *network) {
     }
     printf("\n");
 }
+
+#include <stdio.h>
+#include <stdlib.h>
+
+void save_nn(const nn* network, const char* filename) {
+    FILE* file = fopen(filename, "wb");
+    if (!file) {
+        perror("Failed to open file for writing");
+        return;
+    }
+
+    // Save basic network configuration
+    fwrite(&network->input_size, sizeof(int), 1, file);
+    fwrite(&network->n_hidden_layers, sizeof(int), 1, file);
+
+    // Save hidden layer sizes
+    fwrite(network->hidden_layer_sizes, sizeof(int), network->n_hidden_layers, file);
+
+    // Save input layer
+    fwrite(network->input, sizeof(float), network->input_size, file);
+
+    // Save weights and biases for each hidden layer
+    for (int i = 0; i < network->n_hidden_layers; i++) {
+        int layer_size = network->hidden_layer_sizes[i];
+        for (int j = 0; j < layer_size; j++) {
+            int last_layer_size = (i == 0) ? network->input_size : network->hidden_layer_sizes[i - 1];
+            fwrite(network->weights[i][j], sizeof(float), last_layer_size, file);
+        }
+        fwrite(network->biases[i], sizeof(float), layer_size, file);
+    }
+
+    // Save output weights
+    int last_layer_size = (network->n_hidden_layers > 0) ? network->hidden_layer_sizes[network->n_hidden_layers - 1] : network->input_size;
+    fwrite(network->output_weights, sizeof(float), last_layer_size, file);
+
+    fclose(file);
+}
+
+void load_nn(nn* network, const char* filename) {
+    FILE* file = fopen(filename, "rb");
+    if (!file) {
+        perror("Failed to open file for reading");
+        return;
+    }
+
+    // Load basic network configuration
+    fread(&network->input_size, sizeof(int), 1, file);
+    fread(&network->n_hidden_layers, sizeof(int), 1, file);
+
+    // Allocate and load hidden layer sizes
+    network->hidden_layer_sizes = (int*)malloc(network->n_hidden_layers * sizeof(int));
+    fread(network->hidden_layer_sizes, sizeof(int), network->n_hidden_layers, file);
+
+    // Allocate and load input layer
+    network->input = (float*)malloc(network->input_size * sizeof(float));
+    fread(network->input, sizeof(float), network->input_size, file);
+
+    // Allocate and load weights and biases for each hidden layer
+    network->weights = (float***)malloc(network->n_hidden_layers * sizeof(float**));
+    network->biases = (float**)malloc(network->n_hidden_layers * sizeof(float*));
+    for (int i = 0; i < network->n_hidden_layers; i++) {
+        int layer_size = network->hidden_layer_sizes[i];
+        network->weights[i] = (float**)malloc(layer_size * sizeof(float*));
+        int last_layer_size = (i == 0) ? network->input_size : network->hidden_layer_sizes[i - 1];
+        for (int j = 0; j < layer_size; j++) {
+            network->weights[i][j] = (float*)malloc(last_layer_size * sizeof(float));
+            fread(network->weights[i][j], sizeof(float), last_layer_size, file);
+        }
+        network->biases[i] = (float*)malloc(layer_size * sizeof(float));
+        fread(network->biases[i], sizeof(float), layer_size, file);
+    }
+
+    // Allocate and load output weights
+    int last_layer_size = (network->n_hidden_layers > 0) ? network->hidden_layer_sizes[network->n_hidden_layers - 1] : network->input_size;
+    network->output_weights = (float*)malloc(last_layer_size * sizeof(float));
+    fread(network->output_weights, sizeof(float), last_layer_size, file);
+
+    fclose(file);
+}
+
 
 // float f(float x) {
 //     // make the prime counting function using a sieve
