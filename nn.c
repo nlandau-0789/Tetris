@@ -10,22 +10,26 @@ struct nn {
 
 typedef struct nn nn;
 
-void init_nn(nn* network, int input_size, int n_hidden_layers, int* hidden_layer_sizes, float start_range) {
+void init_nn(nn* network, int input_size, int n_hidden_layers, int* hidden_layer_sizes, float start_range, int seed) {
     network->input_size = input_size;
     network->n_hidden_layers = n_hidden_layers;
     network->hidden_layer_sizes = (int*)malloc(n_hidden_layers * sizeof(int));
     for (int i = 0; i < n_hidden_layers; i++) {
         network->hidden_layer_sizes[i] = hidden_layer_sizes[i];
     }
-
+    int last_layer_size = (n_hidden_layers > 1)?hidden_layer_sizes[n_hidden_layers - 1]:input_size;
     // Allocate memory for inputs, outputs, weights, and biases
     network->input = (float*)malloc(input_size * sizeof(float));
     
     network->weights = (float***)malloc(n_hidden_layers * sizeof(float**));
     network->biases = (float**)malloc(n_hidden_layers * sizeof(float*));
-    network->output_weights = (float*)malloc(hidden_layer_sizes[n_hidden_layers - 1] * sizeof(float));
+    network->output_weights = (float*)malloc(last_layer_size * sizeof(float));
 
-    srand((unsigned int)time(NULL));
+    if (seed) {
+        srand(seed);
+    } else {
+        srand((unsigned int)time(NULL));
+    }
 
     for (int i = 0; i < n_hidden_layers; i++) {
         int layer_size = hidden_layer_sizes[i];
@@ -47,7 +51,6 @@ void init_nn(nn* network, int input_size, int n_hidden_layers, int* hidden_layer
     }
 
     // Output weights in [-0.01, 0.01]
-    int last_layer_size = hidden_layer_sizes[n_hidden_layers - 1];
     for (int k = 0; k < last_layer_size; k++) {
         network->output_weights[k] = ((float)rand() / RAND_MAX) * 2.0f * start_range - start_range;
     }
@@ -77,6 +80,7 @@ void feed_forward(nn* network, float (*activation)(float)) {
         input[i] = network->input[i];
     }
 
+    // printf("%d inputs, %d hidden layers\n", network->input_size, network->n_hidden_layers);
     for (int layer = 0; layer < network->n_hidden_layers; layer++) {
         int layer_size = network->hidden_layer_sizes[layer];
         float* layer_output = (float*)malloc(layer_size * sizeof(float));
@@ -95,9 +99,10 @@ void feed_forward(nn* network, float (*activation)(float)) {
     }
 
     network->output = 0.0f;
-    int last_layer_size = network->hidden_layer_sizes[network->n_hidden_layers - 1];
+    int last_layer_size = (network->n_hidden_layers > 1)?network->hidden_layer_sizes[network->n_hidden_layers - 1]:network->input_size;
     for (int j = 0; j < last_layer_size; j++) {
         network->output += network->output_weights[j] * input[j];
+        // printf("input[%d]: %f %f\n", j, input[j], network->output_weights[j]);
     }
     // network->output = activation(network->output);
 
@@ -139,7 +144,7 @@ void backpropagate(nn* network, float *input, float target, float (*activation)(
 
     // Output layer
     float y = 0.0f;
-    int last_layer_size = network->hidden_layer_sizes[n_layers - 1];
+    int last_layer_size = (network->n_hidden_layers > 1)?network->hidden_layer_sizes[network->n_hidden_layers - 1]:network->input_size;;
     for (int i = 0; i < last_layer_size; i++) {
         y += network->output_weights[i] * activation(x[n_layers - 1][i]);
     }
@@ -249,7 +254,7 @@ void batched_backpropagate(nn* network, float **input, float *target, int batch_
         }
         
         float y = 0.0f;
-        int last_layer_size = network->hidden_layer_sizes[n_layers - 1];
+        int last_layer_size = (network->n_hidden_layers > 1)?network->hidden_layer_sizes[network->n_hidden_layers - 1]:network->input_size;;
         for (int i = 0; i < last_layer_size; i++) {
             y += network->output_weights[i] * activation(x[n_layers - 1][i]);
         }
@@ -369,6 +374,7 @@ float ReLU_derivative(float x) {
 }
 
 void weight_avg_nn(nn *network, nn *other_network, float alpha) {
+    int last_layer_size = (network->n_hidden_layers > 1)?network->hidden_layer_sizes[network->n_hidden_layers - 1]:network->input_size;
     // Average the weights and biases of two networks
     for (int i = 0; i < network->n_hidden_layers; i++) {
         int layer_size = network->hidden_layer_sizes[i];
@@ -380,14 +386,16 @@ void weight_avg_nn(nn *network, nn *other_network, float alpha) {
             network->biases[i][j] = alpha * network->biases[i][j] + (1 - alpha) * other_network->biases[i][j];
         }
     }
-    int last_layer_size = network->hidden_layer_sizes[network->n_hidden_layers - 1];
+    // printf("%d\n", last_layer_size);
     for (int j = 0; j < last_layer_size; j++) {
+        // printf("i was here\n");
         network->output_weights[j] = alpha * network->output_weights[j] + (1 - alpha) * other_network->output_weights[j];
     }
 }
 
 // pretty print the neural network
 void print_nn(nn *network) {
+    int last_layer_size = (network->n_hidden_layers > 1)?network->hidden_layer_sizes[network->n_hidden_layers - 1]:network->input_size;
     printf("Neural Network:\n");
     printf("Input size: %d\n", network->input_size);
     printf("Number of hidden layers: %d\n", network->n_hidden_layers);
@@ -402,11 +410,12 @@ void print_nn(nn *network) {
             printf("\n");
             printf("    Bias: %f\n", network->biases[i][j]);
         }
-        printf("Output weights:\n  ");
-        for (int j = 0; j < network->hidden_layer_sizes[i]; j++) {
-            printf("%f ", network->output_weights[j]);
-        }
     }
+    printf("Output weights:\n  ");
+    for (int j = 0; j < last_layer_size; j++) {
+        printf("%f ", network->output_weights[j]);
+    }
+    printf("\n");
 }
 
 // float f(float x) {

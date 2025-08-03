@@ -25,7 +25,20 @@ void print_board(__m256i board){
         }
         printf("|\n");
     }
-    printf("+----------+\n");
+    printf("+----------+\n\n");
+}
+
+void fprint_board(FILE * f, __m256i board){
+    short values[16];
+    _mm256_storeu_si256((__m256i*)values, board);
+    for (int y = 15; y >= 0; y--){
+        fprintf(f, "|");
+        for (int x = 0; x < 10; x++){
+            fprintf(f, (values[x] & (1<<y)) ? "X":" ");
+        }
+        fprintf(f, "|\n");
+    }
+    fprintf(f, "+----------+\n\n");
 }
 
 __m256i board_from_array(bool *t){
@@ -409,7 +422,6 @@ placement get_placement(int piece, __m256i board, nn *network) {
     return best_placement;
 }
 
-
 int play_full_game(nn *network, int seed) {
     __m256i board = ZERO;
     srand(seed);
@@ -431,19 +443,40 @@ int play_full_game(nn *network, int seed) {
     return 2000000000;
 }
 
-#define Q_LEARNING_TRAIN_C
-#include "q_learning_train.c"
+void print_full_game(FILE * f, nn *network, int seed) {
+    __m256i board = ZERO;
+    srand(seed);
+    int piece = rand() % 7;
+    int n_lines_removed = 0;
+
+    for (int turn = 0; turn < 2000000000; turn++) {
+        placement placement = get_placement(piece, board, network);
+        if (placement.dead) {
+            // printf("Game over! Dead at turn %d\n", turn);
+            return;
+        }
+        board = place(piece, placement.x, placement.r, board, &n_lines_removed);
+        fprint_board(f, board);
+        piece = rand() % 7;
+    }
+}
+
+#define EVO_TRAIN_C
+#include "evo_train.c"
 
 int main(){
     init_piece_placements();
 
-    int n_hidden_layers = 3;
-    int hidden_layer_sizes[] = {32, 32, 32};
-    nn *network = malloc(sizeof(nn));
-    init_nn(network, NN_INPUT_SIZE, n_hidden_layers, hidden_layer_sizes, 0.0001f);
+    int n_hidden_layers = 0;
+    int hidden_layer_sizes[] = {1};
+    int gen_size = 10000, n_games = 10, n_gen = 100000;
+    
+    nn *generation[10000];
+    
+    train_nn(generation, gen_size, n_games, n_gen, n_hidden_layers, hidden_layer_sizes);
 
-    reward_t rewards[] = {phase1_rew};
-    rl_train(network, 1250000, 1000, 0.0001f, 0.1f, 0.25f, rewards, 1);
+    // reward_t rewards[] = {phase1_rew};
+    // rl_train(network, 1250000, 1000, 0.0001f, 0.1f, 0.25f, rewards, 1);
     // batched_q_train(network, 10000, 16, 0.0001f, 0.95f, 1.0f, 0.00025f, rew);
 }
 

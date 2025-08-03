@@ -1,15 +1,16 @@
+#define EVO_TRAIN_C
 #ifdef EVO_TRAIN_C
 void train_nn(nn *generation[], int gen_size, int n_games, int n_gen, int n_hidden_layers, int hidden_layer_sizes[]) {
     nn **new_generation = malloc(gen_size * sizeof(nn*));
 
-    reward_t rewards[] = {phase2_rew};
+    // reward_t rewards[] = {phase2_rew};
     for (int i = 0; i < gen_size; i++) {
         generation[i] = malloc(sizeof(nn));
-        init_nn(generation[i], 160, n_hidden_layers, hidden_layer_sizes);
+        init_nn(generation[i], NN_INPUT_SIZE, n_hidden_layers, hidden_layer_sizes, 1.0f, time(NULL)+i);
 
-        rl_train(generation[i], 6000, 1, 0.0001f, 0.1f, 0.25f, rewards, 1);
-        printf("pretrained %d/%d\r", i+1, gen_size);
-        fflush(stdout);
+        // rl_train(generation[i], 6000, 1, 0.0001f, 0.1f, 0.25f, rewards, 1);
+        // printf("pretrained %d/%d\r", i+1, gen_size);
+        // fflush(stdout);
     }
     for (int gen = 0; gen < n_gen; gen++) {
         int *scores = malloc(gen_size * sizeof(int));
@@ -26,8 +27,9 @@ void train_nn(nn *generation[], int gen_size, int n_games, int n_gen, int n_hidd
                 printf("            \r[%d] Game %02d/%d of instance %04d/%d, score: %d", gen, j+1, n_games, i+1, gen_size, turns);
                 // fflush(stdout);
             }
+            // printf("%d ", scores[i]);
         }
-        
+
         for (int i = 0; i < gen_size - 1; i++) {
             for (int j = i + 1; j < gen_size; j++) {
                 if (scores[i] < scores[j]) {
@@ -41,10 +43,24 @@ void train_nn(nn *generation[], int gen_size, int n_games, int n_gen, int n_hidd
                 }
             }
         }
+        
+        printf("\n");
+        for (int i = 0; i < 10; i++) {
+            printf("%d ", scores[i]);
+        }
+        printf("\n");
+
+        // char buffer[100];
+        // sprintf(buffer, "./games/gen%d", gen);
+        // FILE * f = fopen(buffer, "w");
+        // print_full_game(f, generation[0], time(NULL));
+        // fclose(f);
+
         for (int i = 0; i < gen_size; i++) {
             new_generation[i] = malloc(sizeof(nn));
-            init_nn(new_generation[i], 160, n_hidden_layers, hidden_layer_sizes);
-            weight_avg_nn(new_generation[i], generation[i/20], 0.01f);
+            init_nn(new_generation[i], NN_INPUT_SIZE, n_hidden_layers, hidden_layer_sizes, 1.0f, time(NULL)+i);
+            weight_avg_nn(new_generation[i], generation[i/20], (float)i/gen_size);
+            // printf("%d ", scores[i]);
         }
         for (int i = 0; i < gen_size; i++) {
             free_nn(generation[i]);
