@@ -478,22 +478,26 @@ int main(){
     int n_hidden_layers = 1;
     int hidden_layer_sizes[] = {1};
     int gen_size = 10000, n_games = 10, n_gen = 100000;
-
+    
+    #ifdef DEBUG_VERBOSE
     log_file = fopen("logs", "w");
+    #endif
     
-    nn * network = malloc(sizeof(nn));
-    load_nn(network, "games/gen64");
+    {
+    // nn * network = malloc(sizeof(nn));
+    // load_nn(network, "games/gen64");
 
-    FILE * f = fopen("game", "w");
-    printf("%d\n", print_full_game(f, network, 456784));
-    fclose(f);
-    free(network);
+    // FILE * f = fopen("game", "w");
+    // printf("%d\n", print_full_game(f, network, 456784));
+    // fclose(f);
+    // free(network);
 
-    fclose(log_file);
+    // fclose(log_file);
+    }
 
-    // nn *generation[10000];
+    nn *generation[10000];
     
-    // train_nn(generation, gen_size, n_games, n_gen, n_hidden_layers, hidden_layer_sizes);
+    train_nn(generation, gen_size, n_games, n_gen, n_hidden_layers, hidden_layer_sizes);
 
     // reward_t rewards[] = {phase1_rew};
     // rl_train(network, 1250000, 1000, 0.0001f, 0.1f, 0.25f, rewards, 1);
