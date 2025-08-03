@@ -83,7 +83,7 @@ void rl_train(nn *network, int episodes, int seasons, float learning_rate, float
         int rew_idx = s % n_phases;
         int total_lines_removed = 0;
         double avg_output = 0.0;
-        float threshold_lines = 1000;
+        // float threshold_lines = 1000;
         for (int ep = 0; ep < episodes; ep++) {
             // Start with an empty board
             __m256i board = ZERO;

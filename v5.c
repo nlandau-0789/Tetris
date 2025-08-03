@@ -487,9 +487,9 @@ float advanced_rew(__m256i old_board, __m256i new_board, int n_lines_removed) {
 int main(){
     init_piece_placements();
 
-    int n_hidden_layers = 2;
-    int hidden_layer_sizes[] = {16, 16};
-    int gen_size = 10000, n_games = 10, n_gen = 100000;
+    int n_hidden_layers = 3;
+    int hidden_layer_sizes[] = {32, 32, 32};
+    // int gen_size = 10000, n_games = 10, n_gen = 100000;
     
     #ifdef DEBUG_VERBOSE
     log_file = fopen("logs", "w");
