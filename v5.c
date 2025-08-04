@@ -437,7 +437,9 @@ int play_full_game(nn *network, int seed) {
 
     for (int turn = 0; turn < 2000000000; turn++) {
         placement placement = get_placement(piece, board, network);
+        #ifdef DEBUG_VERBOSE
         printf("%f\n", placement.eval);
+        #endif
         if (placement.dead) {
             // printf("Game over! Dead at turn %d\n", turn);
             return turn;
@@ -480,41 +482,53 @@ nn *rew_nn;
 float advanced_rew(__m256i old_board, __m256i new_board, int n_lines_removed) {
     get_nn_input(rew_nn->input, new_board);
     feed_forward(rew_nn, ReLU);
-    float reward = 1.0f + rew_nn->output * 40.0f;
+    float reward = rew_nn->output * 40 + 1;
+    if (reward > max_reward) {
+        max_reward = reward;
+    }
+    if (reward < min_reward) {
+        min_reward = reward;
+    }
     return reward;
 }
 
 int main(){
     init_piece_placements();
 
-    int n_hidden_layers = 3;
-    int hidden_layer_sizes[] = {32, 32, 32};
-    // int gen_size = 10000, n_games = 10, n_gen = 100000;
+    int n_hidden_layers = 2;
+    int hidden_layer_sizes[] = {16, 16};
     
     #ifdef DEBUG_VERBOSE
     log_file = fopen("logs", "w");
     #endif
     
-    rew_nn = malloc(sizeof(nn));
-    load_nn(rew_nn, "gen103");
-    
-    nn * network = malloc(sizeof(nn));
-    init_nn(network, NN_INPUT_SIZE, n_hidden_layers, hidden_layer_sizes, 0.001f, time(NULL));
     // printf("%d", play_full_game(network, 4567));
-
+    
     // FILE * f = fopen("game", "w");
     // printf("%d\n", print_full_game(f, network, 456784));
     // fclose(f);
+    #define Q_TRAIN
+    #ifdef EVO_TRAIN
+    int gen_size = 10000, n_games = 10, n_gen = 100000, start_gen = 0;
+    nn *generation[10000];
     
-    // nn *generation[10000];
+    train_nn(generation, gen_size, n_games, n_gen, n_hidden_layers, hidden_layer_sizes, start_gen);
+    #endif
     
-    // train_nn(generation, gen_size, n_games, n_gen, n_hidden_layers, hidden_layer_sizes);
+    #ifdef Q_TRAIN
+    rew_nn = malloc(sizeof(nn));
+    load_nn(rew_nn, "gen103");
+    // print_nn(rew_nn);
     
+    nn * network = malloc(sizeof(nn));
+    init_nn(network, NN_INPUT_SIZE, n_hidden_layers, hidden_layer_sizes, 0.001f, time(NULL));
+
     reward_t rewards[] = {advanced_rew};
     rl_train(network, 250000, 1000, 0.0001f, 0.99f, 0.75f, rewards, 1);
-    // batched_q_train(network, 10000, 16, 0.0001f, 0.95f, 1.0f, 0.00025f, rew);
+    // batched_q_train(network, 250000, 16, 0.0001f, 0.95f, 1.0f, 0.00025f, rew);
     free(network);
     free(rew_nn);
+    #endif
 
     #ifdef DEBUG_VERBOSE
     fclose(log_file);

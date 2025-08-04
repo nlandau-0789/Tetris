@@ -17,7 +17,7 @@ void init_nn(nn* network, int input_size, int n_hidden_layers, int* hidden_layer
     for (int i = 0; i < n_hidden_layers; i++) {
         network->hidden_layer_sizes[i] = hidden_layer_sizes[i];
     }
-    int last_layer_size = (n_hidden_layers > 1)?hidden_layer_sizes[n_hidden_layers - 1]:input_size;
+    int last_layer_size = (n_hidden_layers > 0)?hidden_layer_sizes[n_hidden_layers - 1]:input_size;
     // Allocate memory for inputs, outputs, weights, and biases
     network->input = (float*)malloc(input_size * sizeof(float));
     

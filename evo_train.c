@@ -1,18 +1,26 @@
 #define EVO_TRAIN_C
 #ifdef EVO_TRAIN_C
-void train_nn(nn *generation[], int gen_size, int n_games, int n_gen, int n_hidden_layers, int hidden_layer_sizes[]) {
+void train_nn(nn *generation[], int gen_size, int n_games, int n_gen, int n_hidden_layers, int hidden_layer_sizes[], int start_gen) {
     nn **new_generation = malloc(gen_size * sizeof(nn*));
 
+    nn start;
+    if (start_gen > 0){
+        char buffer[100];
+        sprintf(buffer, "./games/gen%d", start_gen);
+        load_nn(&start, buffer);
+    }
     // reward_t rewards[] = {phase2_rew};
     for (int i = 0; i < gen_size; i++) {
         generation[i] = malloc(sizeof(nn));
         init_nn(generation[i], NN_INPUT_SIZE, n_hidden_layers, hidden_layer_sizes, 1.0f, time(NULL)+i);
-
+        if (start_gen > 0){
+            weight_avg_nn(generation[i], &start, (float)i/gen_size);
+        }
         // rl_train(generation[i], 6000, 1, 0.0001f, 0.1f, 0.25f, rewards, 1);
         // printf("pretrained %d/%d\r", i+1, gen_size);
         // fflush(stdout);
     }
-    for (int gen = 0; gen < n_gen; gen++) {
+    for (int gen = start_gen + 1; gen < n_gen; gen++) {
         int *scores = malloc(gen_size * sizeof(int));
         int *seeds = malloc(n_games * sizeof(int));
         srand(time(NULL));
@@ -44,11 +52,11 @@ void train_nn(nn *generation[], int gen_size, int n_games, int n_gen, int n_hidd
             }
         }
         
-        printf("\n");
-        for (int i = 0; i < 10; i++) {
-            printf("%d ", scores[i]);
-        }
-        printf("\n");
+        // printf("\n");
+        // for (int i = 0; i < 10; i++) {
+        //     printf("%d ", scores[i]);
+        // }
+        // printf("\n");
 
         char buffer[100];
         sprintf(buffer, "./games/gen%d", gen);

@@ -2,6 +2,7 @@
 #ifndef NN_INPUT_SIZE
 #define NN_INPUT_SIZE 100
 #endif
+#define MAX_TURNS 2000000000
 float max_reward = -INFINITY;
 float min_reward = INFINITY;
 float phase2_rew(__m256i old_board, __m256i new_board, int n_lines_removed) {
@@ -91,7 +92,7 @@ void rl_train(nn *network, int episodes, int seasons, float learning_rate, float
             int turn = 0;
             int last_piece;
             
-            while (turn < 2500) {
+            while (turn < MAX_TURNS) {
                 int piece = rand() % 7;
                 last_piece = piece;
     
@@ -144,6 +145,7 @@ void rl_train(nn *network, int episodes, int seasons, float learning_rate, float
                 network->input = next_input;
                 feed_forward(network, ReLU);
                 if (isnan(network->output) || fabs(network->output) > 1e15) {
+                    printf("\n%f, %f\n", max_reward, min_reward);
                     printf("Network output unstable: %f\n", network->output);
                     print_nn(network);
                     exit(1);
@@ -197,7 +199,6 @@ void rl_train(nn *network, int episodes, int seasons, float learning_rate, float
 }
 
 void batched_q_train(nn* network, int n_episodes, int batch_size, float learning_rate, float gamma, float epsilon, float epsilon_decay, reward_t rew) {
-    #define MAX_TURNS 2500
     float **states_memory = malloc(MAX_TURNS * sizeof(float*));
     float *targets_memory = malloc(MAX_TURNS * sizeof(float));
     float **states_batch = malloc(batch_size * sizeof(float*));
@@ -268,8 +269,8 @@ void batched_q_train(nn* network, int n_episodes, int batch_size, float learning
             float next_value = (network->output);
 
             float target = (reward + gamma * next_value);
-            if (target > 1000.0f) target = 1000.0f;
-            if (target < -1000.0f) target = -1000.0f;
+            // if (target > 1000.0f) target = 1000.0f;
+            // if (target < -1000.0f) target = -1000.0f;
 
             targets_memory[memory_size] = target;
             memory_size++;
