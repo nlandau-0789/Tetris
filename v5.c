@@ -13,6 +13,7 @@ __builtin_popcount --> il faut -march=native
 #include "utils.h"
 #define n_consts 12
 #define NN_INPUT_SIZE 100
+#define float double
 
 // Utilitaires 
 void print_board(__m256i board){
@@ -495,8 +496,8 @@ float advanced_rew(__m256i old_board, __m256i new_board, int n_lines_removed) {
 int main(){
     init_piece_placements();
 
-    int n_hidden_layers = 2;
-    int hidden_layer_sizes[] = {16, 16};
+    int n_hidden_layers = 4;
+    int hidden_layer_sizes[] = {16, 16, 16, 16};
     
     #ifdef DEBUG_VERBOSE
     log_file = fopen("logs", "w");
@@ -521,11 +522,11 @@ int main(){
     // print_nn(rew_nn);
     
     nn * network = malloc(sizeof(nn));
-    init_nn(network, NN_INPUT_SIZE, n_hidden_layers, hidden_layer_sizes, 0.001f, time(NULL));
+    init_nn(network, NN_INPUT_SIZE, n_hidden_layers, hidden_layer_sizes, 0.01f, time(NULL));
 
     reward_t rewards[] = {advanced_rew};
-    rl_train(network, 250000, 1000, 0.0001f, 0.99f, 0.75f, rewards, 1);
-    // batched_q_train(network, 250000, 16, 0.0001f, 0.95f, 1.0f, 0.00025f, rew);
+    rl_train(network, 250000, 1000, 0.0001f, 0.975f, 0.00001f, rewards, 1);
+    // batched_q_train(network, 250000, 16, 0.0003f, 0.98f, 0.0f, 0.00025f, rew);
     free(network);
     free(rew_nn);
     #endif
