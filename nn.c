@@ -71,11 +71,21 @@ void free_nn(nn* network) {
     for (int i = 0; i < network->output_size; i++){
         free(network->output_weights[i]);
     }
-    free(network->weights);
-    free(network->biases);
-    free(network->hidden_layer_sizes);
-    free(network->output_weights);
-    free(network->output);
+    if (network->weights){
+        free(network->weights);
+    }
+    if (network->biases){
+        free(network->biases);
+    }
+    if (network->hidden_layer_sizes){
+        free(network->hidden_layer_sizes);
+    }
+    if (network->output_weights){
+        free(network->output_weights);
+    }
+    if (network->output){
+        free(network->output);
+    }
     // if (network->input) {
     //     free(network->input);
     // }
@@ -408,7 +418,6 @@ float ReLU_derivative(float x) {
     return (x > 0) ? 1.0f : 0.0f;
 }
 
-#ifdef WEIGHT_AVG
 void weight_avg_nn(nn *network, nn *other_network, float alpha) {
     int last_layer_size = (network->n_hidden_layers > 0)?network->hidden_layer_sizes[network->n_hidden_layers - 1]:network->input_size;
     // Average the weights and biases of two networks
@@ -422,13 +431,12 @@ void weight_avg_nn(nn *network, nn *other_network, float alpha) {
             network->biases[i][j] = alpha * network->biases[i][j] + (1 - alpha) * other_network->biases[i][j];
         }
     }
-    // printf("%d\n", last_layer_size);
-    for (int j = 0; j < last_layer_size; j++) {
-        // printf("i was here\n");
-        network->output_weights[j] = alpha * network->output_weights[j] + (1 - alpha) * other_network->output_weights[j];
+    for (int o = 0; o < network->output_size; o++){
+        for (int j = 0; j < last_layer_size; j++) {
+            network->output_weights[o][j] = alpha * network->output_weights[o][j] + (1 - alpha) * other_network->output_weights[o][j];
+        }
     }
 }
-#endif
 
 // pretty print the neural network
 void print_nn(nn *network) {
@@ -448,17 +456,19 @@ void print_nn(nn *network) {
             printf("    Bias: %f\n", network->biases[i][j]);
         }
     }
-    printf("Output weights:\n  ");
-    for (int j = 0; j < last_layer_size; j++) {
-        printf("%f ", network->output_weights[j]);
-    }
-    printf("\n");
+    printf("Output weights:\n");
+    for (int o = 0; o < network->output_size; o++){
+        printf("  Output %d: ", o);
+        for (int j = 0; j < last_layer_size; j++) {
+            printf("%f ", network->output_weights[o][j]);
+        }
+        printf("\n");
+    } 
 }
 
 #include <stdio.h>
 #include <stdlib.h>
 
-#ifdef SAVE_AND_LOAD
 void save_nn(const nn* network, const char* filename) {
     FILE* file = fopen(filename, "wb");
     if (!file) {
@@ -468,13 +478,11 @@ void save_nn(const nn* network, const char* filename) {
 
     // Save basic network configuration
     fwrite(&network->input_size, sizeof(int), 1, file);
+    fwrite(&network->output_size, sizeof(int), 1, file);
     fwrite(&network->n_hidden_layers, sizeof(int), 1, file);
 
     // Save hidden layer sizes
     fwrite(network->hidden_layer_sizes, sizeof(int), network->n_hidden_layers, file);
-
-    // Save input layer
-    fwrite(network->input, sizeof(float), network->input_size, file);
 
     // Save weights and biases for each hidden layer
     for (int i = 0; i < network->n_hidden_layers; i++) {
@@ -488,7 +496,9 @@ void save_nn(const nn* network, const char* filename) {
 
     // Save output weights
     int last_layer_size = (network->n_hidden_layers > 0) ? network->hidden_layer_sizes[network->n_hidden_layers - 1] : network->input_size;
-    fwrite(network->output_weights, sizeof(float), last_layer_size, file);
+    for (int o = 0; o < network->output_size; o++){
+        fwrite(network->output_weights[o], sizeof(float), last_layer_size, file);
+    } 
 
     fclose(file);
 }
@@ -502,16 +512,21 @@ void load_nn(nn* network, const char* filename) {
 
     // Load basic network configuration
     fread(&network->input_size, sizeof(int), 1, file);
+    fread(&network->output_size, sizeof(int), 1, file);
     fread(&network->n_hidden_layers, sizeof(int), 1, file);
 
     // Allocate and load hidden layer sizes
-    network->hidden_layer_sizes = (int*)malloc(network->n_hidden_layers * sizeof(int));
-    fread(network->hidden_layer_sizes, sizeof(int), network->n_hidden_layers, file);
+    if (network->n_hidden_layers > 0){
+        network->hidden_layer_sizes = (int*)malloc(network->n_hidden_layers * sizeof(int));
+        fread(network->hidden_layer_sizes, sizeof(int), network->n_hidden_layers, file);
+    } else {
+        network->hidden_layer_sizes = NULL;
+    }
 
-    // Allocate and load input layer
+    // Allocate input and output layer
     network->input = (float*)malloc(network->input_size * sizeof(float));
-    fread(network->input, sizeof(float), network->input_size, file);
-
+    network->output = (float*)malloc(network->output_size * sizeof(float));
+    
     // Allocate and load weights and biases for each hidden layer
     network->weights = (float***)malloc(network->n_hidden_layers * sizeof(float**));
     network->biases = (float**)malloc(network->n_hidden_layers * sizeof(float*));
@@ -529,12 +544,14 @@ void load_nn(nn* network, const char* filename) {
 
     // Allocate and load output weights
     int last_layer_size = (network->n_hidden_layers > 0) ? network->hidden_layer_sizes[network->n_hidden_layers - 1] : network->input_size;
-    network->output_weights = (float*)malloc(last_layer_size * sizeof(float));
-    fread(network->output_weights, sizeof(float), last_layer_size, file);
+    network->output_weights = (float**)malloc(network->output_size * sizeof(float*));
+    for (int o = 0; o < network->output_size; o++){
+        network->output_weights[o] = malloc(last_layer_size * sizeof(float));
+        fread(network->output_weights[o], sizeof(float), last_layer_size, file);
+    }
 
     fclose(file);
 }
-#endif
 
 // float f(float x) {
 //     // make the prime counting function using a sieve
@@ -562,13 +579,14 @@ void load_nn(nn* network, const char* filename) {
 //     return (float)count;
 // }
 
-void f(float *input, float *output) {
-    output[0] = input[0] + input[1];
-    output[1] = input[0] * input[1];
-}
+
 
 // make a quick test of the neural network
 #ifdef TEST_NN_BACKPROP
+float f(float x){
+    return x*x*x+x*x-x+1;
+}
+
 int main() {
     nn network;
     int hidden_layer_sizes[] = {100, 100, 100};
@@ -620,8 +638,12 @@ int main() {
 }
 #endif
 
-#define TEST_NN_BACKPROP_BATCH
 #ifdef TEST_NN_BACKPROP_BATCH
+void f(float *input, float *output) {
+    output[0] = input[0] + input[1];
+    output[1] = input[0] * input[1];
+}
+
 int main() {
     nn network;
     int hidden_layer_sizes[] = {10, 10}, output_size = 2;
@@ -697,5 +719,48 @@ int main() {
 
     free_nn(&network);
     return 0;
+}
+#endif
+
+#ifdef TEST_NN_AVG
+int main(){
+    nn a, b;
+
+    int n = 2;
+    init_nn(&a, 1, 1, &n, 2, 1, 1);
+    init_nn(&b, 1, 1, &n, 2, 1, 2);
+
+    print_nn(&a);
+    print_nn(&b);
+    
+    weight_avg_nn(&a, &b, 0.5f);
+    print_nn(&a);
+
+    free_nn(&a);
+    free_nn(&b);
+}
+#endif
+
+#ifdef TEST_SAVE_LOAD
+int main(){
+    nn a, b, c, d;
+
+    int n[] = {2, 2};
+    init_nn(&a, 2, 2, n, 2, 1, 1);
+    print_nn(&a);
+    save_nn(&a, "network_test.model");
+    load_nn(&b, "network_test.model");
+    print_nn(&b);
+    
+    init_nn(&c, 2, 0, NULL, 2, 1, 1);
+    print_nn(&c);
+    save_nn(&c, "network_test.model");
+    load_nn(&d, "network_test.model");
+    print_nn(&d);
+
+    free_nn(&a);
+    free_nn(&b);
+    free_nn(&c);
+    free_nn(&d);
 }
 #endif
