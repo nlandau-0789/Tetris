@@ -357,4 +357,7 @@ __m256i pop_m256i_vector(_m256i_vector *vec) {
     return vec->data[vec->size];
 }
 
+#include "rng.c"
+#include "pool.c"
+
 #endif
