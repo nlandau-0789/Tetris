@@ -13,7 +13,7 @@ __builtin_popcount --> il faut -march=native
 #include "utils.h"
 #define n_consts 12
 #define NN_INPUT_SIZE 100
-#define float double
+// #define float double
 
 // Utilitaires 
 void print_board(__m256i board){
