@@ -13,6 +13,7 @@ __builtin_popcount --> il faut -march=native
 #include "utils.h"
 #define n_consts 12
 #define NN_INPUT_SIZE 100
+#define NN_OUTPUT_SIZE 40
 // #define float double
 
 // Utilitaires 
@@ -358,7 +359,7 @@ __m256i place(int piece, int x, int r, __m256i board, int *n_lines_removed) {
     return new_board;
 }
 
-void is_valid_placement(int piece, int x, int r, __m256i board) {
+bool is_valid_placement(int piece, int x, int r, __m256i board) {
     __m256i piece_board = placements[piece][r];
     for (int i = 0; i < 10-piece_width[piece][r]+1; i++) {
         piece_board = rotate_right_one(piece_board);
@@ -366,6 +367,7 @@ void is_valid_placement(int piece, int x, int r, __m256i board) {
     if (!is_zero_m256i(_mm256_and_si256(piece_board, board))){
         return false;
     }
+    return true;
 }
 
 int get_valid_placements(bool *valid_placements, int piece, __m256i board) {
@@ -401,6 +403,7 @@ void get_nn_input(float input[], __m256i board) {
 #ifdef DEBUG_VERBOSE
 FILE * log_file;
 #endif
+#ifdef LEGACY
 placement get_placement(int piece, __m256i board, nn *network) {
     float best_eval = -INFINITY;
     placement best_placement = {0, 0, 0, true};
@@ -500,14 +503,16 @@ int print_full_game(FILE * f, nn *network, int seed) {
     }
     return 2000000000;
 }
+#endif 
 
-#define EVO_TRAIN_C
 #include "evo_train.c"
-#define Q_LEARNING_TRAIN_C
+#define BATCHED_TRAIN
+#define REWARD_FUNCS
 #include "q_learning_train.c"
 
 nn *rew_nn;
 
+#ifdef LEGACY
 float advanced_rew(__m256i old_board, __m256i new_board, int n_lines_removed) {
     get_nn_input(rew_nn->input, new_board);
     feed_forward(rew_nn, ReLU);
@@ -520,6 +525,7 @@ float advanced_rew(__m256i old_board, __m256i new_board, int n_lines_removed) {
     }
     return reward;
 }
+#endif
 
 int main(){
     init_piece_placements();
@@ -545,16 +551,19 @@ int main(){
     #endif
     
     #ifdef Q_TRAIN
-    rew_nn = malloc(sizeof(nn));
-    load_nn(rew_nn, "gen103");
+    // rew_nn = malloc(sizeof(nn));
+    // load_nn(rew_nn, "gen103");
     // print_nn(rew_nn);
     
     nn * network = malloc(sizeof(nn));
-    init_nn(network, NN_INPUT_SIZE, n_hidden_layers, hidden_layer_sizes, 0.01f, time(NULL));
+    nn * shadow_network = malloc(sizeof(nn));
+    init_nn(network, NN_INPUT_SIZE, n_hidden_layers, hidden_layer_sizes, NN_OUTPUT_SIZE, 0.001f, time(NULL));
+    init_nn(shadow_network, NN_INPUT_SIZE, n_hidden_layers, hidden_layer_sizes, NN_OUTPUT_SIZE, 0.001f, time(NULL));
+    weight_avg_nn(shadow_network, network, 0.0f);
 
-    reward_t rewards[] = {advanced_rew};
-    rl_train(network, 250000, 1000, 0.0001f, 0.975f, 0.00001f, rewards, 1);
-    // batched_q_train(network, 250000, 16, 0.0003f, 0.98f, 0.0f, 0.00025f, rew);
+    // reward_t rewards[] = {advanced_rew};
+    // rl_train(network, 250000, 1000, 0.0001f, 0.975f, 0.00001f, rewards, 1);
+    batched_q_train(network, shadow_network, 250000, 10000, 1, 0.001f, 0.98f, 1.0f, 0.00025f, phase1_rew);
     free(network);
     free(rew_nn);
     #endif

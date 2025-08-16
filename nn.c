@@ -133,11 +133,11 @@ void backpropagate(nn* network, float *input, float *target, float (*activation)
     int n_layers = network->n_hidden_layers;
     float **x = (float**)malloc(n_layers * sizeof(float*));
     for (int i = 0; i < n_layers; i++)
-        x[i] = (float*)malloc(network->hidden_layer_sizes[i] * sizeof(float));
+    x[i] = (float*)malloc(network->hidden_layer_sizes[i] * sizeof(float));
     
     float **dedx = (float**)malloc(n_layers * sizeof(float*));
     for (int i = 0; i < n_layers; i++)
-        dedx[i] = (float*)malloc(network->hidden_layer_sizes[i] * sizeof(float));
+    dedx[i] = (float*)malloc(network->hidden_layer_sizes[i] * sizeof(float));
     
     // Forward pass
     for (int i = 0; i < network->hidden_layer_sizes[0]; i++) {
@@ -173,6 +173,7 @@ void backpropagate(nn* network, float *input, float *target, float (*activation)
     }
 
     // Standard output error and delta
+    fflush(stdout);
     float *output_error = malloc(sizeof(float) * network->output_size);
     float *delta = malloc(sizeof(float) * network->output_size);
     for (int i = 0; i < network->output_size; i++){
@@ -180,8 +181,9 @@ void backpropagate(nn* network, float *input, float *target, float (*activation)
         delta[i] = output_error[i];
     }
     
-    // printf("Output: %f, Target: %f, Error: %f\n", y, target, output_error);
-
+    // printf("Output: %f, Target: %f, Error: %f\n", y[0], target[0], output_error[0]);
+    // fflush(stdout);
+    
     // Update output weights and dedx for next layer
     for (int j = 0; j < last_layer_size; j++) {
         dedx[n_layers - 1][j] = 0;
@@ -190,12 +192,12 @@ void backpropagate(nn* network, float *input, float *target, float (*activation)
             dedx[n_layers - 1][j] += delta[i] * network->output_weights[i][j];
         }
     }
-
+    
     // Hidden layers backpropagation
     for (int layer = n_layers - 1; layer > 0; layer--) {
         int layer_size = network->hidden_layer_sizes[layer];
         int prev_layer_size = network->hidden_layer_sizes[layer - 1];
-
+        
         for (int i = 0; i < prev_layer_size; i++) {
             float error = 0.0f;
             for (int j = 0; j < layer_size; j++) {
@@ -203,7 +205,7 @@ void backpropagate(nn* network, float *input, float *target, float (*activation)
             }
             dedx[layer - 1][i] = error * activation_derivative(x[layer - 1][i]);
         }
-
+        
         for (int j = 0; j < layer_size; j++) {
             for (int k = 0; k < prev_layer_size; k++) {
                 network->weights[layer][j][k] -= learning_rate * dedx[layer][j] * activation(x[layer - 1][k]);
@@ -211,7 +213,7 @@ void backpropagate(nn* network, float *input, float *target, float (*activation)
             network->biases[layer][j] -= learning_rate * dedx[layer][j];
         }
     }
-
+    
     // First layer update
     for (int i = 0; i < network->hidden_layer_sizes[0]; i++) {
         for (int j = 0; j < network->input_size; j++) {
@@ -219,7 +221,7 @@ void backpropagate(nn* network, float *input, float *target, float (*activation)
         }
         network->biases[0][i] -= learning_rate * dedx[0][i];
     }
-
+    
     for (int i = 0; i < n_layers; i++){
         free(x[i]);
         free(dedx[i]);

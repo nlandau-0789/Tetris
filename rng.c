@@ -1,4 +1,6 @@
+#pragma once
 #include <stdlib.h>
+
 
 int draw(int *rng, int start, int end){
     srand(*rng);
