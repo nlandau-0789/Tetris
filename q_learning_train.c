@@ -1,8 +1,12 @@
-#ifdef Q_LEARNING_TRAIN_C
 #ifndef NN_INPUT_SIZE
 #define NN_INPUT_SIZE 100
 #endif
+
+#ifndef MAX_TURNS
 #define MAX_TURNS 2000000000
+#endif
+
+#ifdef Q_LEARNING_TRAIN_C
 float max_reward = -INFINITY;
 float min_reward = INFINITY;
 float phase2_rew(__m256i old_board, __m256i new_board, int n_lines_removed) {
@@ -209,128 +213,151 @@ void rl_train(nn *network, int episodes, int seasons, float learning_rate, float
         // printf("\n");
     }
 }
+#endif
+#ifdef BATCHED_TRAIN
+struct state {
+    float *input;
+    float *reward;
+}
 
-void batched_q_train(nn* network, int n_episodes, int batch_size, float learning_rate, float gamma, float epsilon, float epsilon_decay, reward_t rew) {
-    float **states_memory = malloc(MAX_TURNS * sizeof(float*));
-    float *targets_memory = malloc(MAX_TURNS * sizeof(float));
-    float **states_batch = malloc(batch_size * sizeof(float*));
-    float *targets_batch = malloc(batch_size * sizeof(float));
-    for (int i = 0; i < MAX_TURNS; i++) {
-        states_memory[i] = malloc(NN_INPUT_SIZE * sizeof(float));
-    }
-    
-    bool *seen_idx = malloc(MAX_TURNS * sizeof(int));
-    int memory_size;
+typedef struct state state;
+
+void free_state(state *s){
+    free(s->input);
+    free(s->reward);
+    free(s);
+}
+
+void batched_q_train(nn* network, int n_episodes, int n_batches, int batch_size, float learning_rate, float gamma, float epsilon, float epsilon_decay, reward_t rew) {
+    pool *p;
+    bool valid_placements[40];
     for (int ep = 0; ep < n_episodes; ep++){
-        memory_size = 0;
+        p = init_pool(n_batches * batch_size, free_state, rand())
         __m256i board = ZERO;
-        int piece = rand() % 7;
         int turn = 0;
         int n_lines_removed = 0, total_lines_removed = 0;
         while (turn < MAX_TURNS) {
+            int piece = rand() % 7;
+            int n_valid_placements = get_valid_placements(valid_placements, piece, board);
+            state *s = malloc(sizeof(state));
+            s->input = malloc(sizeof(float) * NN_INPUT_SIZE);
+            s->reward = malloc(sizeof(float) * 40);
+            get_nn_input(s->input, board);
+
+            if (n_valid_placements == 0){
+                for (int i = 0; i < 40; i++){
+                    s->reward[i] = 0; // peut etre mettre -1 ?
+                }
+
+                backpropagate(network, s->input, s->reward, ReLU, ReLU_derivative, learning_rate);
+                free_state(s);
+                break;
+            }
+
+            int r, x, a;
+            network->input = s->input;
+            feed_forward(network, ReLU);
+            for (int i = 0; i < 40; i++){
+                if (isnan(network->output[i])) {
+                    printf("Network output unstable\n");
+                    fflush(stdout);
+                    exit(1);
+                }
+                s->reward[i] = 0;
+            }
+
             // Epsilon-greedy: random move or best move
-            placement best;
             if (((float)rand() / RAND_MAX) < epsilon) {
                 // Random action
-                int r = rand() % n_rot[piece];
-                int x = rand() % (10 - piece_width[piece][r] + 1);
-                // check if the piece can be placed
-                __m256i piece_board = placements[piece][r];
-                best.x = x;
-                best.r = r;
-                best.dead = false;
-                for (int i = 0; i < x; i++) {
-                    piece_board = rotate_right_one(piece_board);
-                }
-                if (!is_zero_m256i(_mm256_and_si256(piece_board, board))){
-                    best.dead = true; // piece overlaps with board
+                int idx = rand() % n_valid_placements;
+                int valid_move_count = 0;
+    
+                for (int rr = 0; rr < n_rot[piece]; rr++){
+                    for (int xx = 0; xx < (10 - piece_width[piece][r] + 1); xx++){
+                        if (valid_placements[rr * 10 + xx]){
+                            if (valid_move_count == idx){
+                                r = rr; 
+                                x = xx;
+                                a = rr * 10 + xx;
+                            }
+                            valid_move_count++;
+                        }
+                    }
                 }
             } else {
                 // Greedy action (use NN)
-                best = get_placement(piece, board, network);
+                float best_eval = -INFINITY;
+                
+                for (int rr = 0; rr < n_rot[piece]; rr++){
+                    for (int xx = 0; xx < (10 - piece_width[piece][r] + 1); xx++){
+                        if (valid_placements[rr * 10 + xx]){
+                            if (network->output[rr*10+xx] > best_eval){
+                                r = rr; 
+                                x = xx;
+                                a = rr * 10 + xx;
+                                best_eval = network->output[rr*10+xx];
+                            }
+                        }
+                    }
+                }
             }
-    
-            // Place the piece
-            float reward = 0;
-            if (best.dead) {
-                reward = -1.0f;
-                float target = -1.0f;
 
-                float input[NN_INPUT_SIZE];
-                get_nn_input(input, board);
-                backpropagate(network, input, target, ReLU, ReLU_derivative, learning_rate);
-                break;
-            }
-            
-            __m256i new_board = place(piece, best.x, best.r, board, &n_lines_removed);
-            reward = rew(board, new_board, n_lines_removed);
+            __m256i new_board = place(piece, x, r, board, &n_lines_removed);
+            float reward = rew(board, new_board, n_lines_removed);
             total_lines_removed += n_lines_removed;
+            s->reward[a] = reward;
 
-            // Prepare NN input for current state
-            float next_input[NN_INPUT_SIZE];
-            get_nn_input(states_memory[memory_size], board);
-            get_nn_input(next_input, new_board);
+            // float next_input[NN_INPUT_SIZE];
+            // get_nn_input(next_input, new_board);
 
-            network->input = next_input;
-            feed_forward(network, ReLU);
-            if (isnan(network->output) || fabs(network->output) > 1e6) {
-                printf("Network output unstable: %f\n", network->output);
-                fflush(stdout);
-                exit(1);
-            }
-            float next_value = (network->output);
+            // network->input = next_input;
+            // feed_forward(network, ReLU);
+            // float next_value = (network->output);
 
-            float target = (reward + gamma * next_value);
+            // float target = (reward + gamma * next_value);
             // if (target > 1000.0f) target = 1000.0f;
             // if (target < -1000.0f) target = -1000.0f;
 
-            targets_memory[memory_size] = target;
-            memory_size++;
+            add_to_pool(p, s);
+
             turn++;
-            // printf("\rTurn %d, piece %d, x=%d, r=%d, reward=%.2f, total_lines_removed=%d", turn, piece, best.x, best.r, reward, total_lines_removed);
             board = new_board; 
         }
         // printf("\n");
         
-        int real_batch_size = memory_size < batch_size ? memory_size : batch_size;
+        int real_batch_size = p->size < batch_size ? p->size : batch_size;
         if (real_batch_size == 0) {
             printf("No valid turns in episode %d (turns : %d), skipping...\n", ep + 1, turn);
             continue; // No valid turns, skip this episode
         }
-
-        // printf("Game done, starting backpropagation for episode %d\n", ep + 1);
         
-        for (int epoch = 0; epoch < 3; epoch++) {
-            for (int i = 0; i < memory_size; i++) {
-                seen_idx[i] = false; // Initialize seen indices
-            }
+        for (int batch_start_idx = 0; batch_start_idx < p->size; batch_start_idx += batch_size) {
+            int real_batch_size = (p->size - batch_start_idx < batch_size) ? (p->size - batch_start_idx) : batch_size;
+            float **inputs = malloc(real_batch_size * sizeof(float*));
+            float **targets = malloc(real_batch_size * sizeof(float*));
             for (int i = 0; i < real_batch_size; i++) {
-                int idx = rand() % memory_size;
-                while (seen_idx[idx]) {
-                    idx = rand() % memory_size;
+                state *s = p->samples[batch_start_idx + i];
+                inputs[i] = s->input;
+                network->input = s->input;
+                feed_forward(network, ReLU);
+                targets[i] = s->reward;
+                for (int j = 0; j < 40; j++) {
+                    if (isnan(targets[i][j])) {
+                        printf("Network output unstable in batch %d, episode %d\n", 1 + batch_start_idx / batch_size, ep + 1);
+                        fflush(stdout);
+                        exit(1);
+                    }
+                    targets[i][j] += gamma * network->output[j];
                 }
-                seen_idx[idx] = true;
-                states_batch[i] = states_memory[idx];
-                targets_batch[i] = targets_memory[idx];
             }
-            
-            // printf("Epoch %d\n", epoch + 1);
-            batched_backpropagate(network, states_batch, targets_batch, real_batch_size, ReLU, ReLU_derivative, learning_rate);
+            batched_backpropagate(network, inputs, targets, real_batch_size, ReLU, ReLU_derivative, learning_rate);
         }
-        printf("\rEpisode %d finished, total_lr=%d        ", ep+1, total_lines_removed);
+        printf("Episode %d finished, total_lr=%d\n", ep+1, total_lines_removed);
         // printf("\n");
         fflush(stdout);
         epsilon -= epsilon_decay;
+        free_pool(p);
     }
-    
-    for (int i = 0; i < MAX_TURNS; i++) {
-        free(states_memory[i]);
-    }
-    free(targets_memory);
-    free(states_memory);
-    free(states_batch);
-    free(targets_batch);
-    free(seen_idx);
 }
 
 #endif

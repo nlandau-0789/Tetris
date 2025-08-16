@@ -358,6 +358,34 @@ __m256i place(int piece, int x, int r, __m256i board, int *n_lines_removed) {
     return new_board;
 }
 
+void is_valid_placement(int piece, int x, int r, __m256i board) {
+    __m256i piece_board = placements[piece][r];
+    for (int i = 0; i < 10-piece_width[piece][r]+1; i++) {
+        piece_board = rotate_right_one(piece_board);
+    }
+    if (!is_zero_m256i(_mm256_and_si256(piece_board, board))){
+        return false;
+    }
+}
+
+int get_valid_placements(bool *valid_placements, int piece, __m256i board) {
+    int n_valid_placements = 0;
+    for (int i = 0; i < 40; i++){
+        valid_placements[i] = false;
+    }
+    for (int r = 0; r < n_rot[piece]; r++) {
+        __m256i piece_board = placements[piece][r];
+        for (int x = 0; x < 10-piece_width[piece][r]+1; x++) {
+            if (is_zero_m256i(_mm256_and_si256(piece_board, board))){
+                valid_placements[r*10+x] = true;
+                n_valid_placements++;
+            }
+            piece_board = rotate_right_one(piece_board);
+        }
+    }
+    return n_valid_placements;
+}
+
 void get_nn_input(float input[], __m256i board) {
     calc_consts(board);
     short temp[16];
