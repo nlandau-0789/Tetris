@@ -1,3 +1,4 @@
+#include "nn.c"
 #ifdef EVO_TRAIN_C
 void train_nn(nn *generation[], int gen_size, int n_games, int n_gen, int n_hidden_layers, int hidden_layer_sizes[], int start_gen) {
     nn **new_generation = malloc(gen_size * sizeof(nn*));
@@ -11,7 +12,7 @@ void train_nn(nn *generation[], int gen_size, int n_games, int n_gen, int n_hidd
     // reward_t rewards[] = {phase2_rew};
     for (int i = 0; i < gen_size; i++) {
         generation[i] = malloc(sizeof(nn));
-        init_nn(generation[i], NN_INPUT_SIZE, n_hidden_layers, hidden_layer_sizes, 40, 1.0f, time(NULL)+i);
+        init_nn(generation[i], NN_INPUT_SIZE, n_hidden_layers, hidden_layer_sizes, NN_OUTPUT_SIZE, 1.0f, time(NULL)+i);
         if (start_gen > 0){
             weight_avg_nn(generation[i], &start, (float)i/gen_size);
         }
@@ -66,7 +67,7 @@ void train_nn(nn *generation[], int gen_size, int n_games, int n_gen, int n_hidd
 
         for (int i = 0; i < gen_size; i++) {
             new_generation[i] = malloc(sizeof(nn));
-            init_nn(new_generation[i], NN_INPUT_SIZE, n_hidden_layers, hidden_layer_sizes, 1.0f, time(NULL)+i);
+            init_nn(new_generation[i], NN_INPUT_SIZE, n_hidden_layers, hidden_layer_sizes, NN_OUTPUT_SIZE, 1.0f, time(NULL)+i);
             weight_avg_nn(new_generation[i], generation[i/20], (float)i/gen_size);
             // printf("%d ", scores[i]);
         }

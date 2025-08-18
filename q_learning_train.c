@@ -221,16 +221,16 @@ void rl_train(nn *network, int episodes, int seasons, float learning_rate, float
 #endif
 #ifdef BATCHED_TRAIN
 struct state {
-    float *input;
-    float *reward;
+    float *s;
+    float Q;
+    int a;
 };
 
 typedef struct state state;
 
 void free_state(void *st){
     state *s = (state*)st;
-    free(s->input);
-    free(s->reward);
+    free(s->s);
     free(s);
 }
 
@@ -243,36 +243,41 @@ void batched_q_train(nn* online, nn* target, int n_episodes, int n_batches, int 
         __m256i board = ZERO;
         int turn = 0;
         int n_lines_removed = 0, total_lines_removed = 0;
+        float max_target = -INFINITY;
 
         while (turn < MAX_TURNS) {
             int piece = rand() % 7;
             int n_valid_placements = get_valid_placements(valid_placements, piece, board);
 
             state *s = malloc(sizeof(state));
-            s->input  = malloc(sizeof(float) * NN_INPUT_SIZE);
-            s->reward = malloc(sizeof(float) * NN_OUTPUT_SIZE);
-            get_nn_input(s->input, board);
+            s->s = malloc(sizeof(float) * NN_INPUT_SIZE);
+            s->a = -1;
+            s->Q = 0.0f;
+            
+            get_nn_input(s->s, board);
 
             if (n_valid_placements == 0) {
-                for (int i = 0; i < NN_OUTPUT_SIZE; i++) {
-                    s->reward[i] = -1.0f;
-                }
-                backpropagate(online, s->input, s->reward, ReLU, ReLU_derivative, learning_rate);
-                free_state(s);
+                add_to_pool(p, s);
                 break;
             }
 
-            int r, x, a;
+            int r = 0, x = 0;
 
             // --- Action selection: use ONLINE network ---
-            online->input = s->input;
+            online->input = s->s;
             feed_forward(online, ReLU);
             for (int i = 0; i < NN_OUTPUT_SIZE; i++) {
                 if (isnan(online->output[i])) {
                     printf("Network output unstable\n");
+                    print_nn(online);
+                    printf("Input: ");
+                    for (int j = 0; j < NN_INPUT_SIZE; j++) {
+                        printf("%f ", online->input[j]);
+                    }
+                    printf("\n");
+                    print_board(board);
                     exit(1);
                 }
-                s->reward[i] = online->output[i]; // init targets with predicted Q(s,*)
             }
 
             // --- Epsilon-greedy ---
@@ -286,7 +291,7 @@ void batched_q_train(nn* online, nn* target, int n_episodes, int n_batches, int 
                             if (valid_move_count == idx) {
                                 r = rr; 
                                 x = xx;
-                                a = rr * 10 + xx;
+                                s->a = rr * 10 + xx;
                             }
                             valid_move_count++;
                         }
@@ -301,12 +306,19 @@ void batched_q_train(nn* online, nn* target, int n_episodes, int n_batches, int 
                             if (online->output[rr * 10 + xx] > best_eval) {
                                 r = rr; 
                                 x = xx;
-                                a = rr * 10 + xx;
+                                s->a = rr * 10 + xx;
                                 best_eval = online->output[rr * 10 + xx];
                             }
                         }
                     }
                 }
+                max_target = fmaxf(max_target, best_eval);
+            }
+
+            if (s->a == -1) {
+                printf("No valid action found, piece %d, board: ", piece);
+                print_board(board);
+                exit(1);
             }
 
             // --- Step environment ---
@@ -315,9 +327,7 @@ void batched_q_train(nn* online, nn* target, int n_episodes, int n_batches, int 
             total_lines_removed += n_lines_removed;
 
             // --- Bootstrap with TARGET network ---
-            float next_input[NN_INPUT_SIZE];
-            get_nn_input(next_input, new_board);
-            target->input = next_input;
+            get_nn_input(target->input, new_board);
             feed_forward(target, ReLU);
 
             float max_next_q = 0.0f;
@@ -328,9 +338,8 @@ void batched_q_train(nn* online, nn* target, int n_episodes, int n_batches, int 
             }
 
             // TD target for the chosen action
-            s->reward[a] = reward + gamma * max_next_q;
-
-            // printf("rew : %f, max_next_q: %f\n", reward, max_next_q);
+            s->Q = reward + gamma * max_next_q;
+            // printf("reward: %f, max_next_q: %f\n", reward, max_next_q);
 
             // Store transition
             add_to_pool(p, s);
@@ -347,19 +356,35 @@ void batched_q_train(nn* online, nn* target, int n_episodes, int n_batches, int 
             float **inputs  = malloc(real_batch_size * sizeof(float*));
             float **targets = malloc(real_batch_size * sizeof(float*));
             for (int i = 0; i < real_batch_size; i++) {
+                targets[i] = malloc(sizeof(float) * NN_OUTPUT_SIZE);
                 state *s = p->samples[batch_start_idx + i];
-                inputs[i]  = s->input;
-                targets[i] = s->reward;
+                inputs[i] = s->s ;
+                online->input = inputs[i];
+                feed_forward(online, ReLU);
+                if (s->a == -1) {
+                    for (int j = 0; j < NN_OUTPUT_SIZE; j++) {
+                        targets[i][j] = 0.0f;
+                    }
+                } else {
+                    for (int j = 0; j < NN_OUTPUT_SIZE; j++) {
+                        targets[i][j] = online->output[j];
+                    }
+                    targets[i][s->a] = s->Q; // Update target for the chosen action
+                }
             }
-            batched_backpropagate(online, inputs, targets, real_batch_size,
-                                  ReLU, ReLU_derivative, learning_rate);
+            batched_backpropagate(online, inputs, targets, real_batch_size, ReLU, ReLU_derivative, learning_rate);
+            for (int i = 0; i < real_batch_size; i++) {
+                free(targets[i]);
+            }
+            free(inputs);
+            free(targets);
         }
 
         // --- Soft update: ONLINE → TARGET ---
-        float tau = 0.01f;
+        float tau = 1.0f;
         weight_avg_nn(target, online, 1.0f - tau);
 
-        printf("Episode %d finished, total_lr=%d, rew_range = [%f:%f]\n", ep+1, total_lines_removed, min_reward, max_reward);
+        printf("Episode %d finished, total_lr=%d, rew_range = [%f:%f], max_t = %f\n", ep+1, total_lines_removed, min_reward, max_reward, max_target);
         fflush(stdout);
 
         epsilon -= epsilon_decay;

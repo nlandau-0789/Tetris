@@ -1,3 +1,4 @@
+#pragma once
 #include "utils.h"
 
 struct nn {
@@ -48,8 +49,8 @@ void init_nn(nn* network, int input_size, int n_hidden_layers, int* hidden_layer
 
         network->biases[i] = (float*)malloc(layer_size * sizeof(float));
         for (int j = 0; j < layer_size; j++) {
-            // network->biases[i][j] = ((float)rand() / RAND_MAX) * 2.0f * start_range - start_range;
-            network->biases[i][j] = 0;
+            network->biases[i][j] = ((float)rand() / RAND_MAX) * 2.0f * start_range - start_range;
+            // network->biases[i][j] = 0;
         }
     }
     for (int i = 0; i < output_size; i++){
@@ -174,8 +175,8 @@ void backpropagate(nn* network, float *input, float *target, float (*activation)
 
     // Standard output error and delta
     fflush(stdout);
-    float *output_error = malloc(sizeof(float) * network->output_size);
-    float *delta = malloc(sizeof(float) * network->output_size);
+    float *output_error = calloc(network->output_size, sizeof(float));
+    float *delta = calloc(network->output_size, sizeof(float));
     for (int i = 0; i < network->output_size; i++){
         output_error[i] = y[i] - target[i];
         delta[i] = output_error[i];
@@ -265,9 +266,9 @@ void batched_backpropagate(nn* network, float **input, float **target, int batch
     // printf("Temporary arrays allocated\n");
     
     // Process each sample in the batch
-    float *y = malloc(network->output_size * sizeof(float));
-    float *output_error = malloc(network->output_size * sizeof(float));
-    float *delta = malloc(network->output_size * sizeof(float));
+    float *y = calloc(network->output_size, sizeof(float));
+    float *output_error = calloc(network->output_size, sizeof(float));
+    float *delta = calloc(network->output_size, sizeof(float));
     for (int b = 0; b < batch_size; b++) {
         // Forward pass
         for (int o = 0; o < network->output_size; o++){
@@ -284,8 +285,16 @@ void batched_backpropagate(nn* network, float **input, float **target, int batch
                 float sum = 0.0f;
                 for (int k = 0; k < network->input_size; k++) {
                     sum += network->weights[0][i][k] * input[b][k];
+                    if (isnan(sum)) {
+                        fprintf(stderr, "NaN detected in layer 0, neuron %d : %f %f\n", i, network->weights[0][i][k], input[b][k]);
+                        fflush(stdout); exit(0);
+                    }
                 }
                 sum += network->biases[0][i];
+                if (isnan(sum)) {
+                    fprintf(stderr, "NaN detected in layer 0, neuron %d (bias): %f\n", i, network->biases[0][i]);
+                    fflush(stdout); exit(0);
+                }
                 x[0][i] = sum;
             }
             
@@ -296,20 +305,36 @@ void batched_backpropagate(nn* network, float **input, float **target, int batch
                     float sum = 0.0f;
                     for (int k = 0; k < prev_layer_size; k++) {
                         sum += network->weights[layer][i][k] * activation(x[layer - 1][k]);
+                        if (isnan(sum)) {
+                            fprintf(stderr, "NaN detected in layer %d, neuron %d : %f %f\n", layer, i, network->weights[layer][i][k], activation(x[layer - 1][k]));
+                            fflush(stdout); exit(0);
+                        }
                     }
                     sum += network->biases[layer][i];
+                    if (isnan(sum)) {
+                        fprintf(stderr, "NaN detected in layer %d, neuron %d (bias): %f\n", layer, i, network->biases[layer][i]);
+                        fflush(stdout); exit(0);
+                    }
                     x[layer][i] = sum;
                 }
             }
             for (int o = 0; o < network->output_size; o++){
                 for (int i = 0; i < last_layer_size; i++) {
                     y[o] += network->output_weights[o][i] * activation(x[n_layers - 1][i]);
+                    if (isnan(y[o])) {
+                        fprintf(stderr, "NaN detected in output %d (1): %f %f\n", o, network->output_weights[o][i], activation(x[n_layers - 1][i]));
+                        fflush(stdout); exit(0);
+                    }
                 }
             }
         } else {
             for (int o = 0; o < network->output_size; o++){
                 for (int i = 0; i < last_layer_size; i++) {
                     y[o] += network->output_weights[o][i] * activation(input[b][i]);
+                    if (isnan(y[o])) {
+                        fprintf(stderr, "NaN detected in output %d (2): %f %f\n", o, network->output_weights[o][i], activation(input[b][i]));
+                        fflush(stdout); exit(0);
+                    }
                 }
             }
         }
@@ -320,11 +345,23 @@ void batched_backpropagate(nn* network, float **input, float **target, int batch
         }
         for (int o = 0; o < network->output_size; o++){
             output_error[o] = y[o] - target[b][o];
+            if (isnan(output_error[o]) || isinf(output_error[o])) {
+                fprintf(stderr, "NaN detected in output error %d: %f %f\n", o, y[o], target[b][o]);
+                fflush(stdout); exit(0);
+            }
             delta[o] = output_error[o];
             
             for (int i = 0; i < last_layer_size; i++) {
                 grad_output_weights[o][i] += delta[o] * activation(x[n_layers - 1][i]);
+                if (isnan(grad_output_weights[o][i])) {
+                    fprintf(stderr, "NaN detected in grad_output_weights[%d][%d]: %f %f\n", o, i, delta[o], activation(x[n_layers - 1][i]));
+                    fflush(stdout); exit(0);
+                }
                 dedx[n_layers - 1][i] += delta[o] * network->output_weights[o][i];
+                if (isnan(dedx[n_layers - 1][i])) {
+                    fprintf(stderr, "NaN detected in dedx[%d][%d]: %f %f\n", n_layers - 1, i, delta[o], network->output_weights[o][i]);
+                    fflush(stdout); exit(0);
+                }
             }
         }
         
@@ -336,23 +373,47 @@ void batched_backpropagate(nn* network, float **input, float **target, int batch
                 float error = 0.0f;
                 for (int j = 0; j < layer_size; j++) {
                     error += dedx[layer][j] * network->weights[layer][j][i];
+                    if (isnan(error)) {
+                        fprintf(stderr, "NaN detected in error at layer %d, neuron %d: %f %f\n", layer, i, dedx[layer][j], network->weights[layer][j][i]);
+                        fflush(stdout); exit(0);
+                    }
                 }
                 dedx[layer - 1][i] = error * activation_derivative(x[layer - 1][i]);
+                if (isnan(dedx[layer - 1][i])) {
+                    fprintf(stderr, "NaN detected in dedx[%d][%d]: %f %f\n", layer - 1, i, error, activation_derivative(x[layer - 1][i]));
+                    fflush(stdout); exit(0);
+                }
             }
 
             for (int j = 0; j < layer_size; j++) {
                 for (int k = 0; k < prev_layer_size; k++) {
                     grad_weights[layer][j][k] += dedx[layer][j] * activation(x[layer - 1][k]);
+                    if (isnan(grad_weights[layer][j][k])) {
+                        fprintf(stderr, "NaN detected in grad_weights[%d][%d][%d]: %f %f\n", layer, j, k, dedx[layer][j], activation(x[layer - 1][k]));
+                        fflush(stdout); exit(0);
+                    }
                 }
                 grad_biases[layer][j] += dedx[layer][j];
+                if (isnan(grad_biases[layer][j])) {
+                    fprintf(stderr, "NaN detected in grad_biases[%d][%d]: %f\n", layer, j, dedx[layer][j]);
+                    fflush(stdout); exit(0);
+                }
             }
         }
         if (network->n_hidden_layers > 0){
             for (int i = 0; i < network->hidden_layer_sizes[0]; i++) {
                 for (int j = 0; j < network->input_size; j++) {
                     grad_weights[0][i][j] += dedx[0][i] * input[b][j];
+                    if (isnan(grad_weights[0][i][j])) {
+                        fprintf(stderr, "NaN detected in grad_weights[0][%d][%d]: %f %f\n", i, j, dedx[0][i], input[b][j]);
+                        fflush(stdout); exit(0);
+                    }
                 }
                 grad_biases[0][i] += dedx[0][i];
+                if (isnan(grad_biases[0][i])) {
+                    fprintf(stderr, "NaN detected in grad_biases[0][%d]: %f\n", i, dedx[0][i]);
+                    fflush(stdout); exit(0);
+                }
             }
         } 
     }
@@ -365,6 +426,10 @@ void batched_backpropagate(nn* network, float **input, float **target, int batch
     for (int o = 0; o < network->output_size; o++){
         for (int i = 0; i < last_layer_size; i++) {
             network->output_weights[o][i] -= learning_rate * grad_output_weights[o][i];
+            if (isnan(network->output_weights[o][i])) {
+                fprintf(stderr, "NaN detected in output_weights[%d][%d]: %f %f\n", o, i, learning_rate, grad_output_weights[o][i]);
+                fflush(stdout); exit(0);
+            }
         }
     }
 
@@ -373,8 +438,16 @@ void batched_backpropagate(nn* network, float **input, float **target, int batch
             int prev_layer_size = (layer == 0) ? network->input_size : network->hidden_layer_sizes[layer - 1];
             for (int k = 0; k < prev_layer_size; k++) {
                 network->weights[layer][j][k] -= learning_rate * grad_weights[layer][j][k];
+                if (isnan(network->weights[layer][j][k])) {
+                    fprintf(stderr, "NaN detected in weights[%d][%d][%d]: %f %f\n", layer, j, k, learning_rate, grad_weights[layer][j][k]);
+                    fflush(stdout); exit(0);
+                }
             }
             network->biases[layer][j] -= learning_rate * grad_biases[layer][j];
+            if (isnan(network->biases[layer][j])) {
+                fprintf(stderr, "NaN detected in biases[%d][%d]: %f %f\n", layer, j, learning_rate, grad_biases[layer][j]);
+                fflush(stdout); exit(0);
+            }
         }
     }
     // printf("Weights and biases updated\n");
@@ -400,7 +473,8 @@ void batched_backpropagate(nn* network, float **input, float **target, int batch
     }
     free(x);
     free(dedx);
-    // printf("Memory freed\n");
+    // printf("backpropagated\n");
+    // fflush(stdout);
 }
 
 
@@ -639,16 +713,15 @@ int main() {
     free_nn(&network);
 }
 #endif
-
 #ifdef TEST_NN_BACKPROP_BATCH
 void f(float *input, float *output) {
-    output[0] = input[0] + input[1];
+    output[0] = input[0] - input[1];
     output[1] = input[0] * input[1];
 }
 
 int main() {
     nn network;
-    int hidden_layer_sizes[] = {10, 10}, output_size = 2;
+    int hidden_layer_sizes[] = {32, 32}, output_size = 2;
     init_nn(&network, 2, 2, hidden_layer_sizes, output_size, 0.1f, 0);
 
     int batch_size = 8; // Define the batch size
@@ -661,7 +734,7 @@ int main() {
     }
 
     // Train the network on f
-    for (int j = 0; j < 1000; j++) {
+    for (int j = 0; j < 10000; j++) {
         // printf("Epoch %d\n", j);
         float total_mse = 0.0f;
 
@@ -709,15 +782,18 @@ int main() {
     free(batch_target);
 
     // Test the network
-    // network.input[0] = 0;
-    // feed_forward(&network, ReLU);
-    // float prev = network.output;
-    // for (int i = 1; i < 100; i++) {
-    //     network.input[0] = (float)i / 100.0f;
-    //     feed_forward(&network, ReLU);
-    //     printf("%f\n", network.output - f((float)i / 100.0f));
-    //     // prev = network.output;
-    // }
+    float in[2], out[2]; 
+    for (int i = 1; i < 100; i++) {
+        for (int j = 0; j < 100; j++){
+            network.input[0] = (float)i / 100.0f;
+            network.input[1] = (float)j / 100.0f;
+            in[0] = network.input[0];
+            in[1] = network.input[1];
+            f(in, out);
+            feed_forward(&network, ReLU);
+            printf("%f %f\n", network.output[0] - out[0], network.output[1] - out[1]);
+        }
+    }
 
     free_nn(&network);
     return 0;

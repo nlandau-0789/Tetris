@@ -403,92 +403,75 @@ void get_nn_input(float input[], __m256i board) {
 #ifdef DEBUG_VERBOSE
 FILE * log_file;
 #endif
-#ifdef LEGACY
 placement get_placement(int piece, __m256i board, nn *network) {
-    float best_eval = -INFINITY;
-    placement best_placement = {0, 0, 0, true};
-    for (int r = 0; r < n_rot[piece]; r++) {
-        __m256i piece_board_init = placements[piece][r];
-        for (int x = 0; x < 10-piece_width[piece][r]+1; x++) { // potential +/-1 mistake
-            #ifdef DEBUG_VERBOSE
-            // printf("Trying piece %d, rotation %d, x=%d\n", piece, r, x);
-            #endif
-            int y = 16;
-            __m256i piece_board = piece_board_init;
-            if (!is_zero_m256i(_mm256_and_si256(piece_board, board))){
-                #ifdef DEBUG_VERBOSE
-                fprint_board(log_file, board);
-                fprint_board(log_file, piece_board);
-                fprintf(log_file, "Piece overlaps with board at x=%d, r=%d\n", x, r);
-                #endif
-                piece_board_init = rotate_right_one(piece_board_init);
-                continue; // piece overlaps with board
-            }
-            while (y > piece_height[piece][r] && is_zero_m256i(_mm256_and_si256(_mm256_srli_epi16(piece_board, 1), board))){ // potential +/-1 mistake
-                y--;
-                piece_board = _mm256_srli_epi16(piece_board, 1);
-                #ifdef DEBUG_VERBOSE
-                fprint_board(log_file, piece_board);
-                #endif
-            }
+    float input[NN_INPUT_SIZE];
+    get_nn_input(input, board);
+    network->input = input;
+    feed_forward(network, ReLU);
 
-            // evaluate the placement
-            __m256i new_board = _mm256_or_si256(board, piece_board);
-            remove_full_lines(&new_board);
-            calc_consts(new_board);
+    bool valid_placements[NN_OUTPUT_SIZE];
+    int n_valid_placements = get_valid_placements(valid_placements, piece, board);
+    
+    placement best = {0, 0, -INFINITY, false};
 
-            float input[NN_INPUT_SIZE];
-            get_nn_input(input, new_board);
+    if (n_valid_placements == 0) {
+        best.dead = true;
+        return best;
+    }
 
-            // run the nn
-            float *save_old_input = network->input;
-            network->input = input;
-            feed_forward(network, ReLU);
-            float eval = network->output;
-            network->input = save_old_input;
-
-            if (eval > best_eval) {
-                best_eval = eval;
-                best_placement.x = x;
-                best_placement.r = r;
-                best_placement.eval = eval;
-                best_placement.dead = false;
-            }
-            
-            piece_board_init = rotate_right_one(piece_board_init);
+    for (int i = 0; i < NN_OUTPUT_SIZE; i++) {
+        if (valid_placements[i] && network->output[i] > best.eval) {
+            best.r = i / 10;
+            best.x = i % 10;
+            best.eval = network->output[i];
         }
     }
-    return best_placement;
+    return best;
 }
 
-int play_full_game(nn *network, int seed) {
+int play_full_game(nn *network, unsigned seed) {
     __m256i board = ZERO;
-    srand(seed);
-    int piece = rand() % 7;
+    int piece = rand_r(&seed) % 7;
     int n_lines_removed = 0;
 
     for (int turn = 0; turn < 2000000000; turn++) {
         placement placement = get_placement(piece, board, network);
         #ifdef DEBUG_VERBOSE
-        printf("%f\n", placement.eval);
+        printf("%e\n", placement.eval);
         #endif
         if (placement.dead) {
             // printf("Game over! Dead at turn %d\n", turn);
             return turn;
-        }
+        } 
+        // else {
+        //     if (placement.eval == -INFINITY) {
+        //         // printf("Invalid placement at turn %d\n", turn);
+        //         print_board(board);
+        //         print_board(placements[piece][placement.r]);
+        //         bool valid_placements[NN_OUTPUT_SIZE];
+        //         get_valid_placements(valid_placements, piece, board);
+        //         for (int r = 0; r < 4; r++) {
+        //             for (int x = 0; x < 10; x++) {
+        //                 printf("%c", valid_placements[10*r+x]?'x':'_');
+        //             }
+        //             printf("\n");
+        //         }
+        //         return turn;
+        //     }
+        // }
         board = place(piece, placement.x, placement.r, board, &n_lines_removed);
         #ifdef DEBUG_VERBOSE
         print_board(board);
         #endif
-        piece = rand() % 7;
+        piece = rand_r(&seed) % 7;
     }
     return 2000000000;
 }
 
-int print_full_game(FILE * f, nn *network, int seed) {
+int print_full_game(FILE * f, nn *network, unsigned seed) {
     __m256i board = ZERO;
     srand(seed);
-    int piece = rand() % 7;
+    int piece = rand_r(&seed) % 7;
     int n_lines_removed = 0;
 
     for (int turn = 0; turn < 2000000000; turn++) {
@@ -499,15 +482,13 @@ int print_full_game(FILE * f, nn *network, int seed) {
         }
         board = place(piece, placement.x, placement.r, board, &n_lines_removed);
         fprint_board(f, board);
-        piece = rand() % 7;
+        piece = rand_r(&seed) % 7;
     }
     return 2000000000;
 }
-#endif 
 
+#define EVO_TRAIN_C
 #include "evo_train.c"
-#define BATCHED_TRAIN
-#define REWARD_FUNCS
 #include "q_learning_train.c"
 
 nn *rew_nn;
@@ -530,8 +511,8 @@ float advanced_rew(__m256i old_board, __m256i new_board, int n_lines_removed) {
 int main(){
     init_piece_placements();
 
-    int n_hidden_layers = 4;
-    int hidden_layer_sizes[] = {16, 16, 16, 16};
+    int n_hidden_layers = 3;
+    int hidden_layer_sizes[] = {32, 32, 32};
     
     #ifdef DEBUG_VERBOSE
     log_file = fopen("logs", "w");
@@ -542,8 +523,7 @@ int main(){
     // FILE * f = fopen("game", "w");
     // printf("%d\n", print_full_game(f, network, 456784));
     // fclose(f);
-    #define Q_TRAIN
-    #ifdef EVO_TRAIN
+    #ifdef EVO_TRAIN_C
     int gen_size = 10000, n_games = 10, n_gen = 100000, start_gen = 0;
     nn *generation[10000];
     
@@ -557,13 +537,14 @@ int main(){
     
     nn * network = malloc(sizeof(nn));
     nn * shadow_network = malloc(sizeof(nn));
-    init_nn(network, NN_INPUT_SIZE, n_hidden_layers, hidden_layer_sizes, NN_OUTPUT_SIZE, 0.001f, time(NULL));
-    init_nn(shadow_network, NN_INPUT_SIZE, n_hidden_layers, hidden_layer_sizes, NN_OUTPUT_SIZE, 0.001f, time(NULL));
+    init_nn(network, NN_INPUT_SIZE, n_hidden_layers, hidden_layer_sizes, NN_OUTPUT_SIZE, 0.1f, time(NULL));
+    init_nn(shadow_network, NN_INPUT_SIZE, n_hidden_layers, hidden_layer_sizes, NN_OUTPUT_SIZE, 0.0f, time(NULL));
     weight_avg_nn(shadow_network, network, 0.0f);
+    // print_nn(network);
 
     // reward_t rewards[] = {advanced_rew};
     // rl_train(network, 250000, 1000, 0.0001f, 0.975f, 0.00001f, rewards, 1);
-    batched_q_train(network, shadow_network, 250000, 10000, 1, 0.001f, 0.98f, 1.0f, 0.00025f, phase1_rew);
+    batched_q_train(network, shadow_network, 2000000000, 10000, 3, 0.0001f, 0.98f, 1.0f, 0.000025f, phase1_rew);
     free(network);
     free(rew_nn);
     #endif
