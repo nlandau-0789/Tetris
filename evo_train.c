@@ -14,7 +14,7 @@ void train_nn(nn *generation[], int gen_size, int n_games, int n_gen, int n_hidd
         generation[i] = malloc(sizeof(nn));
         init_nn(generation[i], NN_INPUT_SIZE, n_hidden_layers, hidden_layer_sizes, 1.0f, time(NULL)+i);
         if (start_gen > 0){
-            weight_avg_nn(generation[i], &start, (float)i/gen_size);
+            weight_avg_nn(generation[i], &start, (float)i/gen_size/(float)(start_gen+1));
         }
         // rl_train(generation[i], 6000, 1, 0.0001f, 0.1f, 0.25f, rewards, 1);
         // printf("pretrained %d/%d\r", i+1, gen_size);
@@ -29,8 +29,12 @@ void train_nn(nn *generation[], int gen_size, int n_games, int n_gen, int n_hidd
         }
         for (int i = 0; i < gen_size; i++) {
             scores[i] = 0;
+            // scores[i] = 2000000000;
             for (int j = 0; j < n_games; j++) {
                 int turns = play_full_game(generation[i], seeds[j]);
+                // if (turns < scores[i]) {
+                //     scores[i] = turns;
+                // }
                 scores[i] += turns;
                 printf("            \r[%d] Game %02d/%d of instance %04d/%d, score: %d", gen, j+1, n_games, i+1, gen_size, turns);
                 // fflush(stdout);
@@ -68,7 +72,7 @@ void train_nn(nn *generation[], int gen_size, int n_games, int n_gen, int n_hidd
         for (int i = 0; i < gen_size; i++) {
             new_generation[i] = malloc(sizeof(nn));
             init_nn(new_generation[i], NN_INPUT_SIZE, n_hidden_layers, hidden_layer_sizes, 1.0f, time(NULL)+i);
-            weight_avg_nn(new_generation[i], generation[i/20], (float)i/gen_size);
+            weight_avg_nn(new_generation[i], generation[i/20], (float)i/gen_size/(float)(gen+1));
             // printf("%d ", scores[i]);
         }
         for (int i = 0; i < gen_size; i++) {
