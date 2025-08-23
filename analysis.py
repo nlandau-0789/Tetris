@@ -23,4 +23,5 @@ def plot(filename, window_size=250):
 plot("logs_lr9")
 plot("logs_lr13")
 plot("logs_lr12")
+plot("logs_lr14")
 plt.show()
