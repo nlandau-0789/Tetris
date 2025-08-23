@@ -89,10 +89,7 @@ void rl_train(nn *network, nn *target_network, int episodes, int seasons, float 
         int total_lines_removed = 0;
         double avg_output = 0.0;
         float threshold_lines = 100000.0f;
-        int turn_count = 0;
-        int epoches = 1;
         for (int ep = 0; ep < episodes; ep++) {
-            double max_output = -INFINITY;
             // Start with an empty board
             __m256i board = ZERO;
             float total_reward = 0;
@@ -100,7 +97,6 @@ void rl_train(nn *network, nn *target_network, int episodes, int seasons, float 
             int last_piece;
             
             while (turn < MAX_TURNS) {
-                turn_count++;
                 int piece = rand() % 7;
                 last_piece = piece;
     
@@ -133,8 +129,8 @@ void rl_train(nn *network, nn *target_network, int episodes, int seasons, float 
     
                     float input[NN_INPUT_SIZE];
                     get_nn_input(input, board);
-                    for (int epoch = 0; epoch < 3 * epoches; epoch++) {
-                        backpropagate(network, input, target, ReLU, ReLU_derivative, learning_rate / 3.0f / epoches);
+                    for (int epoch = 0; epoch < 3; epoch++) {
+                        backpropagate(network, input, target, ReLU, ReLU_derivative, learning_rate / 3.0f);
                     }
                     break;
                 }
@@ -153,23 +149,20 @@ void rl_train(nn *network, nn *target_network, int episodes, int seasons, float 
                 target_network->input = next_input;
                 feed_forward(target_network, ReLU);
                 if (isnan(target_network->output)) {
-                    printf("\n%f %f %f\n", min_reward, max_reward, avg_output / turn_count);
+                    printf("\n%f %f %f\n", min_reward, max_reward, avg_output / log_every);
                     printf("Network output unstable: %f\n", target_network->output);
                     // print_nn(target_network);
                     exit(1);
                 }
                 float next_value = (target_network->output);
                 avg_output += next_value;
-                max_output = (next_value > max_output)?next_value:max_output;
     
                 float target = (reward + gamma * next_value);
                 // if (target > 10000000.0f) target = 10000000.0f;
                 // if (target < -10000000.0f) target = -10000000.0f;
     
                 // Train on (state, target)
-                for (int epoch = 0; epoch < epoches; epoch++) {
-                    backpropagate(network, input, target, ReLU, ReLU_derivative, learning_rate / epoches);
-                }
+                backpropagate(network, input, target, ReLU, ReLU_derivative, learning_rate);
     
                 // Move to next state
                 board = new_board;
@@ -190,14 +183,12 @@ void rl_train(nn *network, nn *target_network, int episodes, int seasons, float 
             }
             if ((ep + 1) % log_every == 0) {
                 // printf("\rEpisode %d finished, avg_lr=%lf, avg_output=%lf        ", ep+1, (double)total_lines_removed/500, avg_output / 500.0);
-                printf("%d %f %f|", total_lines_removed/log_every, max_output, avg_output / turn_count);
+                printf("%d ", total_lines_removed/log_every);
                 avg_output = 0.0;
-                turn_count = 0;
                 fflush(stdout);
                 if (total_lines_removed > threshold_lines * log_every) {
                     // printf("used it");
                     learning_rate *= 0.5f;
-                    epoches *= 2;
                     threshold_lines *= 10;
                 }
                 total_lines_removed = 0;

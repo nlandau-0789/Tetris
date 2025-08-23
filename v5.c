@@ -527,7 +527,7 @@ int main(){
     // init_nn(network, NN_INPUT_SIZE, n_hidden_layers, hidden_layer_sizes, 0.001f, time(NULL));
 
     reward_t rewards[] = {advanced_rew};
-    rl_train(network, target_network, 250000, 1, 0.0002f, 0.99f, -1.0f, rewards, 1);
+    rl_train(network, target_network, 250000, 1, 0.0001f, 0.98f, -1.0f, rewards, 1);
     // batched_q_train(network, 250000, 16, 0.0003f, 0.98f, 0.0f, 0.00025f, rew);
     free(network);
     free(rew_nn);

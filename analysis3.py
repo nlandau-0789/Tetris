@@ -37,4 +37,4 @@ def plot(*filenames, window_size=250):
 
     plt.show()
 
-plot("logs_scores_eval1", "logs_scores_eval2", "logs_scores_eval3", window_size=20)
+plot("logs_scores_eval2", "logs_scores_eval3", window_size=20)
