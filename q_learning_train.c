@@ -80,7 +80,7 @@ typedef float (*reward_t)(__m256i, __m256i, int);
 void rl_train(nn *network, nn *target_network, int episodes, int seasons, float learning_rate, float gamma_i, float epsilon_i, reward_t reward_calcs[], int n_phases) {
     srand(time(NULL));
     int log_every = 1;
-    int target_update_every = 25000;
+    int target_update_every = 1;
     for (int s = 0; s < seasons; s++) {
         float epsilon = epsilon_i;
         float epsilon_decay = 1.0001f;
@@ -89,7 +89,9 @@ void rl_train(nn *network, nn *target_network, int episodes, int seasons, float 
         int total_lines_removed = 0;
         double avg_output = 0.0;
         float threshold_lines = 100000.0f;
+        int turn_count = 0;
         for (int ep = 0; ep < episodes; ep++) {
+            double max_output = -INFINITY;
             // Start with an empty board
             __m256i board = ZERO;
             float total_reward = 0;
@@ -97,6 +99,7 @@ void rl_train(nn *network, nn *target_network, int episodes, int seasons, float 
             int last_piece;
             
             while (turn < MAX_TURNS) {
+                turn_count++;
                 int piece = rand() % 7;
                 last_piece = piece;
     
@@ -156,6 +159,7 @@ void rl_train(nn *network, nn *target_network, int episodes, int seasons, float 
                 }
                 float next_value = (target_network->output);
                 avg_output += next_value;
+                max_output = (next_value > max_output)?next_value:max_output;
     
                 float target = (reward + gamma * next_value);
                 // if (target > 10000000.0f) target = 10000000.0f;
@@ -183,13 +187,20 @@ void rl_train(nn *network, nn *target_network, int episodes, int seasons, float 
             }
             if ((ep + 1) % log_every == 0) {
                 // printf("\rEpisode %d finished, avg_lr=%lf, avg_output=%lf        ", ep+1, (double)total_lines_removed/500, avg_output / 500.0);
-                printf("%d ", total_lines_removed/log_every);
+                printf("%d %f %f|", total_lines_removed/log_every, max_output, avg_output / turn_count);
+                if (total_lines_removed/log_every > 1000000) {
+                    char buffer[100];
+                    sprintf(buffer, "networks/%d.model", total_lines_removed/log_every);
+                    save_nn(network, buffer);
+                }
                 avg_output = 0.0;
+                turn_count = 0;
                 fflush(stdout);
                 if (total_lines_removed > threshold_lines * log_every) {
                     // printf("used it");
-                    learning_rate *= 0.5f;
+                    learning_rate *= 0.1f;
                     threshold_lines *= 10;
+                    // target_update_every *= 1000;
                 }
                 total_lines_removed = 0;
             } 
