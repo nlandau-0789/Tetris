@@ -6,7 +6,7 @@ int main(){
     
     nn *network = malloc(sizeof(nn));
     // load_nn(network, "networks/2504855.model"); // 844k
-    load_nn(network, "networks/3912987.model"); 
+    load_nn(network, "5058339.model"); 
     unsigned long long score = 0, max_score = 0, ttime = 0;
     int n_games = 10000;
     int seed = time(NULL);
@@ -20,6 +20,9 @@ int main(){
         seed = next_seed;
         int end_time = time(NULL);
         ttime += (end_time - start_time);
+        FILE * f = fopen("test_model", "a");
+        fprintf(f, "%lld ", (long long)game_score);
+        fclose(f);
         printf("%d : %lld %lld %lld/s     \r", (i+1), score/(i+1), max_score, score * 5 / 2 /ttime);
         fflush(stdout);
     }

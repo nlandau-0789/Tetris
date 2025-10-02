@@ -9,7 +9,7 @@ def moving_average(data, window_size):
         raise ValueError("Data array is empty. Cannot compute moving average.")
     return np.convolve(data, np.ones(window_size)/window_size, mode='valid')
 
-def plot(filename, window_size=500):
+def plot(filename, window_size=750):
     with open(filename, "r") as f:
         r = f.read()
         if ("|" in r):
