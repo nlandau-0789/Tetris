@@ -1,5 +1,4 @@
 /*
-
 on représente le plateau dans un vec, avec chaque colonne comme un 16bit int, on a un big array avec les bitmasks (_m246i) pour le placement de chaque piece possible -> et les lignes qui sont possiblement supprimées dans ce cas
 
 on passe le board en copie
@@ -11,7 +10,7 @@ __builtin_popcount --> il faut -march=native
 */
 
 #include "utils.h"
-#define n_consts 12
+#define N_FEATURES 10
 #define NN_INPUT_SIZE 100
 #define float double
 
@@ -66,7 +65,7 @@ __m256i board_from_array(bool *t){
     return result;
 }
 
-__m256i consts[n_consts];
+__m256i consts[N_FEATURES];
 
 void calc_consts(__m256i input) {
     __m256i heights = ZERO;
@@ -315,8 +314,6 @@ struct placement {
 
 typedef struct placement placement;
 
-#include "nn.c"
-
 int remove_full_lines(__m256i *board) {
     __m256i full_lines = *board;
     full_lines = _mm256_and_si256(full_lines, rotate_right(full_lines, 11));
@@ -352,16 +349,15 @@ __m256i place(int piece, int x, int r, __m256i board, int *n_lines_removed) {
         // print_board(piece_board);
     }
 
-    // evaluate the placement
     __m256i new_board = _mm256_or_si256(board, piece_board);
     *n_lines_removed = remove_full_lines(&new_board);
     return new_board;
 }
 
-void get_nn_input(float input[], __m256i board) {
+void realise_features(float input[], __m256i board) {
     calc_consts(board);
     short temp[16];
-    for (int i = 0; i < 10; i++) {
+    for (int i = 0; i < N_FEATURES; i++) {
         _mm256_storeu_si256((__m256i*)(&temp), consts[i]);
         for (int j = 0; j < 10; j++) {
             input[i * 10 + j] = temp[j];
@@ -370,9 +366,23 @@ void get_nn_input(float input[], __m256i board) {
     }
 }
 
+
+void print_features(__m256i board) {
+    calc_consts(board);
+    short temp[16];
+    for (int i = 0; i < N_FEATURES; i++) {
+        _mm256_storeu_si256((__m256i*)(&temp), consts[i]);
+        for (int j = 0; j < 10; j++) {
+            printf("%hd ", temp[j]);
+        }
+        printf("\n");
+    }
+}
+
 #ifdef DEBUG_VERBOSE
 FILE * log_file;
 #endif
+/*
 placement get_placement(int piece, __m256i board, nn *network) {
     float best_eval = -INFINITY;
     placement best_placement = {0, 0, 0, true};
@@ -460,7 +470,7 @@ int print_full_game(FILE * f, nn *network, int seed) {
     srand(seed);
     int piece = rand() % 7;
     int n_lines_removed = 0;
-
+    
     for (int turn = 0; turn < 2000000000; turn++) {
         placement placement = get_placement(piece, board, network);
         if (placement.dead) {
@@ -473,97 +483,17 @@ int print_full_game(FILE * f, nn *network, int seed) {
     }
     return 2000000000;
 }
+*/
 
-// #define EVO_TRAIN_C
-#include "evo_train.c"
-#define Q_LEARNING_TRAIN_C
-#include "q_learning_train.c"
-
-nn *rew_nn;
-
-float advanced_rew(__m256i old_board, __m256i new_board, int n_lines_removed) {
-    get_nn_input(rew_nn->input, new_board);
-    feed_forward(rew_nn, ReLU);
-    float reward = rew_nn->output * 40 + 1;
-    if (reward > max_reward) {
-        max_reward = reward;
-    }
-    if (reward < min_reward) {
-        min_reward = reward;
-    }
-    return reward;
-}
-
-float look_ahead_rew(__m256i new_board, nn *network, int look_ahead) {
-    if (look_ahead <= 0) {
-        get_nn_input(rew_nn->input, new_board);
-        feed_forward(rew_nn, ReLU);
-        float reward = rew_nn->output * 40 + 1;
-        if (reward > max_reward) {
-            max_reward = reward;
-        }
-        if (reward < min_reward) {
-            min_reward = reward;
-        }
-        return reward;
-    }
-    float reward = 0;
-    int count = 0;
-    int lr = 0;
-    for (int p = 0; p < 7; p++) {
-        placement best = get_placement(p, new_board, network);
-        if (best.dead) continue;
-        count++;
-        int n_lines_removed;
-        __m256i next_board = place(p, best.x, best.r, new_board, &lr);
-        if (look_ahead > 0) {
-            reward += look_ahead_rew(next_board, network, look_ahead - 1);
-        }
-    }
-    if (count == 0) return -1.0f;
-    return reward / count;
-}
-
-#ifndef TEST_MODEL
+#ifdef RUN
 int main(){
     init_piece_placements();
-
-    int n_hidden_layers = 5;
-    int hidden_layer_sizes[] = {32, 32, 32, 32, 32};
     
     #ifdef DEBUG_VERBOSE
     log_file = fopen("logs", "w");
     #endif
     
-    // printf("%d", play_full_game(network, 4567));
-    
-    // FILE * f = fopen("game", "w");
-    // printf("%d\n", print_full_game(f, network, 456784));
-    // fclose(f);
-    #ifdef EVO_TRAIN
-    int gen_size = 1500, n_games = 5, n_gen = 100000, start_gen = 0;
-    nn *generation[1500];
-    
-    train_nn(generation, gen_size, n_games, n_gen, n_hidden_layers, hidden_layer_sizes, start_gen);
-    #endif
-    #define Q_TRAIN
-    #ifdef Q_TRAIN
-    rew_nn = malloc(sizeof(nn));
-    load_nn(rew_nn, "gen358");
-    // print_nn(rew_nn);
-    
-    nn * network = malloc(sizeof(nn));
-    load_nn(network, "gen371");
-    nn * target_network = malloc(sizeof(nn));
-    load_nn(target_network, "gen371");
-    // init_nn(network, NN_INPUT_SIZE, n_hidden_layers, hidden_layer_sizes, 0.001f, time(NULL));
 
-    reward_t rewards[] = {look_ahead_rew};
-    rl_train(network, target_network, 250000, 0.0001f, 0.985f, -1.0f, look_ahead_rew, 1);
-    // batched_q_train(network, 250000, 16, 0.0003f, 0.98f, 0.0f, 0.00025f, rew);
-    free(network);
-    free(rew_nn);
-    #endif
 
     #ifdef DEBUG_VERBOSE
     fclose(log_file);
