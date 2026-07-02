@@ -75,9 +75,11 @@ float rew(__m256i old_board, __m256i new_board, int n_lines_removed) {
     return 1.0f;
 }
 
-typedef float (*reward_t)(__m256i, __m256i, int);
+typedef float (*reward_t)(__m256i, nn *, int);
 
-void rl_train(nn *network, nn *target_network, int episodes, int seasons, float learning_rate, float gamma_i, float epsilon_i, reward_t reward_calcs[], int n_phases) {
+void rl_train(nn *network, nn *target_network, int episodes, float learning_rate, float gamma_i, float epsilon_i, reward_t reward_calcs, int look_ahead) {
+    int n_phases = 1;
+    int seasons = 1;
     srand(time(NULL));
     int log_every = 1;
     int target_update_every = 1;
@@ -139,7 +141,7 @@ void rl_train(nn *network, nn *target_network, int episodes, int seasons, float 
                 }
                 int n_lines_removed;
                 __m256i new_board = place(piece, best.x, best.r, board, &n_lines_removed);
-                reward = reward_calcs[rew_idx](board, new_board, n_lines_removed);
+                reward = reward_calcs(new_board, network, look_ahead);
                 total_reward += reward;
                 total_lines_removed += n_lines_removed;
     
@@ -242,6 +244,7 @@ void rl_train(nn *network, nn *target_network, int episodes, int seasons, float 
     }
 }
 
+#ifdef BATCHED_Q_TRAIN_C
 void batched_q_train(nn* network, int n_episodes, int batch_size, float learning_rate, float gamma, float epsilon, float epsilon_decay, reward_t rew) {
     float **states_memory = malloc(MAX_TURNS * sizeof(float*));
     float *targets_memory = malloc(MAX_TURNS * sizeof(float));
@@ -365,4 +368,5 @@ void batched_q_train(nn* network, int n_episodes, int batch_size, float learning
     free(seen_idx);
 }
 
+#endif
 #endif

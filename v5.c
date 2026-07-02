@@ -494,6 +494,36 @@ float advanced_rew(__m256i old_board, __m256i new_board, int n_lines_removed) {
     return reward;
 }
 
+float look_ahead_rew(__m256i new_board, nn *network, int look_ahead) {
+    if (look_ahead <= 0) {
+        get_nn_input(rew_nn->input, new_board);
+        feed_forward(rew_nn, ReLU);
+        float reward = rew_nn->output * 40 + 1;
+        if (reward > max_reward) {
+            max_reward = reward;
+        }
+        if (reward < min_reward) {
+            min_reward = reward;
+        }
+        return reward;
+    }
+    float reward = 0;
+    int count = 0;
+    int lr = 0;
+    for (int p = 0; p < 7; p++) {
+        placement best = get_placement(p, new_board, network);
+        if (best.dead) continue;
+        count++;
+        int n_lines_removed;
+        __m256i next_board = place(p, best.x, best.r, new_board, &lr);
+        if (look_ahead > 0) {
+            reward += look_ahead_rew(next_board, network, look_ahead - 1);
+        }
+    }
+    if (count == 0) return -1.0f;
+    return reward / count;
+}
+
 #ifndef TEST_MODEL
 int main(){
     init_piece_placements();
@@ -528,8 +558,8 @@ int main(){
     load_nn(target_network, "gen371");
     // init_nn(network, NN_INPUT_SIZE, n_hidden_layers, hidden_layer_sizes, 0.001f, time(NULL));
 
-    reward_t rewards[] = {advanced_rew};
-    rl_train(network, target_network, 250000, 1, 0.0001f, 0.985f, -1.0f, rewards, 1);
+    reward_t rewards[] = {look_ahead_rew};
+    rl_train(network, target_network, 250000, 0.0001f, 0.985f, -1.0f, look_ahead_rew, 1);
     // batched_q_train(network, 250000, 16, 0.0003f, 0.98f, 0.0f, 0.00025f, rew);
     free(network);
     free(rew_nn);
