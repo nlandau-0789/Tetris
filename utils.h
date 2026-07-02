@@ -357,4 +357,25 @@ __m256i pop_m256i_vector(_m256i_vector *vec) {
     return vec->data[vec->size];
 }
 
+#include <stdint.h>
+#include <time.h>
+
+static uint64_t _state;
+
+void set_random_seed(uint64_t seed){
+    _state = seed;
+}
+
+uint64_t random64()
+{
+    uint64_t z = (_state += 0x9e3779b97f4a7c15ULL);
+    z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9ULL;
+    z = (z ^ (z >> 27)) * 0x94d049bb133111ebULL;
+    return z ^ (z >> 31);
+}
+
+int randint(int a, int b){
+    return a + (random64() % (b-a));
+}
+
 #endif
