@@ -7,6 +7,7 @@
 #include <stdint.h>
 #include <time.h>
 #include <math.h>
+#include <limits.h>
 
 void print_m256i_as_int16(__m256i vec) {
     short values[16];
@@ -303,6 +304,19 @@ __m256i max_all_epi16(__m256i input) {
     input = _mm256_max_epi16(input, _mm256_srli_si256(input, 8));
     __m256i result = cut_epi16(input, 15);
     return result;
+}
+
+int reduce_add_all_epi32(__m256i v)
+{
+    __m128i lo = _mm256_castsi256_si128(v);
+    __m128i hi = _mm256_extracti128_si256(v, 1);
+
+    __m128i sum = _mm_add_epi32(lo, hi);      // 8 -> 4
+
+    sum = _mm_hadd_epi32(sum, sum);           // 4 -> 2
+    sum = _mm_hadd_epi32(sum, sum);           // 2 -> 1
+
+    return _mm_cvtsi128_si32(sum);
 }
 
 int is_zero_m256i(__m256i vec) {
